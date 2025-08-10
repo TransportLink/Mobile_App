@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'logout.dart';
+
 class DriverProfileSetting extends StatefulWidget {
   const DriverProfileSetting({super.key});
 
@@ -43,67 +45,55 @@ class _DriverProfileSettingState extends State<DriverProfileSetting> {
                           size: 40, color: Colors.indigo),
                     ),
                     const SizedBox(height: 18),
-                    TextFormField(
+                    _buildTextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        prefixIcon: Icon(Icons.person),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please enter your name' : null,
+                      label: 'Full Name',
+                      icon: Icons.person,
+                      validatorText: 'Please enter your name',
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildTextField(
                       controller: _phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone Number',
-                        prefixIcon: Icon(Icons.phone),
-                        border: OutlineInputBorder(),
-                      ),
+                      label: 'Phone Number',
+                      icon: Icons.phone,
                       keyboardType: TextInputType.phone,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter your phone number' : null,
+                      validatorText: 'Enter your phone number',
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildTextField(
                       controller: _seatsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Number of Seats',
-                        prefixIcon: Icon(Icons.event_seat),
-                        border: OutlineInputBorder(),
-                      ),
+                      label: 'Number of Seats',
+                      icon: Icons.event_seat,
                       keyboardType: TextInputType.number,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter number of seats' : null,
+                      validatorText: 'Enter number of seats',
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildTextField(
                       controller: _vehicleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Vehicle Info',
-                        prefixIcon: Icon(Icons.directions_car),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter vehicle information' : null,
+                      label: 'Vehicle Info',
+                      icon: Icons.directions_car,
+                      validatorText: 'Enter vehicle information',
                     ),
                     const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _saveProfile,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save and Continue'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          textStyle: const TextStyle(fontSize: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                    _buildPrimaryButton(
+                      text: 'Save and Continue',
+                      icon: Icons.save,
+                      color: Colors.indigo,
+                      onPressed: _saveProfile,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPrimaryButton(
+                      text: 'Logout',
+                      icon: Icons.logout,
+                      color: Colors.red,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LogoutScreen(),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -112,6 +102,58 @@ class _DriverProfileSettingState extends State<DriverProfileSetting> {
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _seatsController.dispose();
+    _vehicleController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPrimaryButton({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(text),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          textStyle: const TextStyle(fontSize: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required String validatorText,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      keyboardType: keyboardType,
+      validator: (value) => value!.isEmpty ? validatorText : null,
     );
   }
 
