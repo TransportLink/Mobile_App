@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/auth_vehicle_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
   final String vehicleId;
@@ -21,14 +22,15 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   final _colorController = TextEditingController();
   final _seatingCapacityController = TextEditingController();
   final _insuranceNumberController = TextEditingController();
-  final _insuranceExpiryDateController = TextEditingController();
+  final _insuranceExpiryController = TextEditingController();
   String? _vehicleType;
   String? _photoUrl;
   XFile? _newPhoto;
   bool _isLoading = true;
   bool _isEditing = false;
 
-  final AuthService _authService = AuthService();
+  final AuthService _authService =
+      AuthService(); 
 
   @override
   void initState() {
@@ -38,14 +40,16 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
 
   Future<void> _fetchVehicle() async {
     try {
-      final vehicle = await _authService.getVehicle(widget.vehicleId);
-      if (vehicle['error'] != null) {
+      final result = await _authService.getVehicle(widget.vehicleId);
+      if (!result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(vehicle['error'])),
+          SnackBar(
+              content: Text(result['message'] ?? 'Failed to fetch vehicle')),
         );
         Navigator.pop(context);
         return;
       }
+      final vehicle = result['data'];
       setState(() {
         _plateNumberController.text = vehicle['plate_number'] ?? '';
         _vehicleType = vehicle['vehicle_type'];
@@ -53,9 +57,11 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
         _modelController.text = vehicle['model'] ?? '';
         _yearController.text = vehicle['year']?.toString() ?? '';
         _colorController.text = vehicle['color'] ?? '';
-        _seatingCapacityController.text = vehicle['seating_capacity']?.toString() ?? '';
+        _seatingCapacityController.text =
+            vehicle['seating_capacity']?.toString() ?? '';
         _insuranceNumberController.text = vehicle['insurance_number'] ?? '';
-        _insuranceExpiryDateController.text = vehicle['insurance_expiry_date'] ?? '';
+        _insuranceExpiryController.text =
+            vehicle['insurance_expiry_date'] ?? '';
         _photoUrl = vehicle['photo_url'];
         _isLoading = false;
       });
@@ -79,6 +85,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        final prefs = await SharedPreferences.getInstance();
+        final accessToken = prefs.getString('access_token') ?? '';
         final data = {
           'plate_number': _plateNumberController.text,
           'vehicle_type': _vehicleType,
@@ -88,15 +96,16 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
           'color': _colorController.text,
           'seating_capacity': int.parse(_seatingCapacityController.text),
           'insurance_number': _insuranceNumberController.text,
-          'insurance_expiry_date': _insuranceExpiryDateController.text,
+          'insurance_expiry_date': _insuranceExpiryController.text,
         };
 
-        final result = await _authService.updateVehicle(widget.vehicleId, data, photoPath: _newPhoto?.path);
+        final result = await _authService.updateVehicle(widget.vehicleId, data,
+            photoPath: _newPhoto?.path, accessToken: accessToken);
 
         setState(() => _isLoading = false);
-        if (result['vehicle_id'] != null) {
+        if (result['success']) {
           setState(() {
-            _photoUrl = result['photo_url'];
+            _photoUrl = result['data']['photo_url'];
             _newPhoto = null;
             _isEditing = false;
           });
@@ -105,7 +114,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['error'] ?? 'Failed to update vehicle')),
+            SnackBar(
+                content: Text(result['message'] ?? 'Failed to update vehicle')),
           );
         }
       } catch (e) {
@@ -120,13 +130,17 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   Future<void> _deleteVehicle() async {
     setState(() => _isLoading = true);
     try {
-      final result = await _authService.deleteVehicle(widget.vehicleId);
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('access_token') ?? '';
+      final result = await _authService.deleteVehicle(widget.vehicleId,
+          accessToken: accessToken);
       setState(() => _isLoading = false);
-      if (result['message'] != null) {
+      if (result['success']) {
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['error'] ?? 'Failed to delete vehicle')),
+          SnackBar(
+              content: Text(result['message'] ?? 'Failed to delete vehicle')),
         );
       }
     } catch (e) {
@@ -146,7 +160,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     _colorController.dispose();
     _seatingCapacityController.dispose();
     _insuranceNumberController.dispose();
-    _insuranceExpiryDateController.dispose();
+    _insuranceExpiryController.dispose();
     super.dispose();
   }
 
@@ -169,7 +183,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Delete Vehicle'),
-                  content: const Text('Are you sure you want to delete this vehicle?'),
+                  content: const Text(
+                      'Are you sure you want to delete this vehicle?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -180,7 +195,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         Navigator.pop(context);
                         _deleteVehicle();
                       },
-                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      child: const Text('Delete',
+                          style: TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -203,10 +219,12 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         height: 150,
                         color: Colors.grey[200],
                         child: _newPhoto != null
-                            ? Image.file(File(_newPhoto!.path), fit: BoxFit.cover)
+                            ? Image.file(File(_newPhoto!.path),
+                                fit: BoxFit.cover)
                             : _photoUrl != null
                                 ? Image.network(_photoUrl!, fit: BoxFit.cover)
-                                : const Center(child: Text('No photo available')),
+                                : const Center(
+                                    child: Text('No photo available')),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -231,9 +249,12 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         fillColor: Colors.white,
                       ),
                       items: ['car', 'van', 'bus', 'bike', 'other']
-                          .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                          .map((type) =>
+                              DropdownMenuItem(value: type, child: Text(type)))
                           .toList(),
-                      onChanged: _isEditing ? (value) => setState(() => _vehicleType = value) : null,
+                      onChanged: _isEditing
+                          ? (value) => setState(() => _vehicleType = value)
+                          : null,
                       validator: (value) => value == null ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
@@ -270,7 +291,9 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       enabled: _isEditing,
                       keyboardType: TextInputType.number,
                       validator: (value) =>
-                          value!.isEmpty || int.tryParse(value) == null ? 'Enter a valid year' : null,
+                          value!.isEmpty || int.tryParse(value) == null
+                              ? 'Enter a valid year'
+                              : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -295,7 +318,9 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       enabled: _isEditing,
                       keyboardType: TextInputType.number,
                       validator: (value) =>
-                          value!.isEmpty || int.tryParse(value) == null ? 'Enter a valid number' : null,
+                          value!.isEmpty || int.tryParse(value) == null
+                              ? 'Enter a valid number'
+                              : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -310,7 +335,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
-                      controller: _insuranceExpiryDateController,
+                      controller: _insuranceExpiryController,
                       decoration: const InputDecoration(
                         labelText: 'Insurance Expiry Date (YYYY-MM-DD)',
                         border: OutlineInputBorder(),
@@ -318,10 +343,10 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         fillColor: Colors.white,
                       ),
                       enabled: _isEditing,
-                      validator: (value) =>
-                          value!.isEmpty || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
-                              ? 'Enter a valid date (YYYY-MM-DD)'
-                              : null,
+                      validator: (value) => value!.isEmpty ||
+                              !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
+                          ? 'Enter a valid date (YYYY-MM-DD)'
+                          : null,
                     ),
                     if (_isEditing) ...[
                       const SizedBox(height: 20),
@@ -334,7 +359,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator()
-                            : const Text('Update Vehicle', style: TextStyle(fontSize: 16)),
+                            : const Text('Update Vehicle',
+                                style: TextStyle(fontSize: 16)),
                       ),
                     ],
                   ],

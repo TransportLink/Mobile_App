@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/auth_vehicle_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart'; 
 
 class AddVehicleScreen extends StatefulWidget {
   const AddVehicleScreen({super.key});
@@ -51,6 +52,8 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        final prefs = await SharedPreferences.getInstance();
+        final accessToken = prefs.getString('access_token') ?? '';
         final data = {
           'plate_number': _plateNumberController.text,
           'vehicle_type': _vehicleType,
@@ -63,15 +66,14 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
           'insurance_expiry_date': _insuranceExpiryDateController.text,
         };
 
-        final result =
-            await _authService.addVehicle(data, photoPath: _photo?.path);
+        final result = await _authService.addVehicle(data, photoPath: _photo?.path, accessToken: accessToken);
 
         setState(() => _isLoading = false);
-        if (result['vehicle_id'] != null) {
+        if (result['success']) {
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['error'] ?? 'Failed to add vehicle')),
+            SnackBar(content: Text(result['message'] ?? 'Failed to add vehicle')),
           );
         }
       } catch (e) {
@@ -99,11 +101,11 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
               GestureDetector(
                 onTap: _pickImage,
                 child: CircleAvatar(
-                  radius: 75, // adjust size as needed
+                  radius: 75,
                   backgroundColor: Colors.grey[300],
                   backgroundImage: _photo != null
                       ? FileImage(File(_photo!.path))
-                      : null, // no network image for vehicle in this example
+                      : null,
                   child: _photo == null
                       ? const Icon(
                           Icons.directions_car,
@@ -134,8 +136,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                   fillColor: Colors.white,
                 ),
                 items: ['car', 'van', 'bus', 'bike', 'other']
-                    .map((type) =>
-                        DropdownMenuItem(value: type, child: Text(type)))
+                    .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                     .toList(),
                 onChanged: (value) => setState(() => _vehicleType = value),
                 validator: (value) => value == null ? 'Required' : null,
@@ -171,9 +172,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 ),
                 keyboardType: TextInputType.number,
                 validator: (value) =>
-                    value!.isEmpty || int.tryParse(value) == null
-                        ? 'Enter a valid year'
-                        : null,
+                    value!.isEmpty || int.tryParse(value) == null ? 'Enter a valid year' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -196,9 +195,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 ),
                 keyboardType: TextInputType.number,
                 validator: (value) =>
-                    value!.isEmpty || int.tryParse(value) == null
-                        ? 'Enter a valid number'
-                        : null,
+                    value!.isEmpty || int.tryParse(value) == null ? 'Enter a valid number' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -219,10 +216,10 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                   filled: true,
                   fillColor: Colors.white,
                 ),
-                validator: (value) => value!.isEmpty ||
-                        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
-                    ? 'Enter a valid date (YYYY-MM-DD)'
-                    : null,
+                validator: (value) =>
+                    value!.isEmpty || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
+                        ? 'Enter a valid date (YYYY-MM-DD)'
+                        : null,
               ),
               const SizedBox(height: 20),
               ElevatedButton(

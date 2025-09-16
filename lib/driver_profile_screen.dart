@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_service.dart';
 import 'logout.dart';
 
 class DriverProfileScreen extends StatefulWidget {
-  final String accessToken;
-  const DriverProfileScreen({super.key, required this.accessToken});
+  const DriverProfileScreen({super.key}); // Removed accessToken
 
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
@@ -38,7 +38,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   }
 
   Future<void> _loadDriverInfo() async {
-    final result = await _authService.fetchDriverProfile(widget.accessToken);
+    final result = await _authService.fetchDriverProfile(); // No accessToken
     if (result["success"]) {
       setState(() {
         _driverInfo = result["data"];
@@ -46,8 +46,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         _phoneNumberController.text = _driverInfo!["phone_number"] ?? "";
         _dobController.text = _driverInfo!["date_of_birth"] ?? "";
         _licenseNumberController.text = _driverInfo!["license_number"] ?? "";
-        _licenseExpiryController.text =
-            _driverInfo!["license_expiry_date"] ?? "";
+        _licenseExpiryController.text = _driverInfo!["license_expiry_date"] ?? "";
         _nationalIdController.text = _driverInfo!["national_id"] ?? "";
         _isLoading = false;
       });
@@ -85,8 +84,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
       };
 
       try {
+        final prefs = await SharedPreferences.getInstance();
+        final accessToken = prefs.getString('access_token') ?? ''; 
         final result = await _authService.updateDriverProfile(
-          accessToken: widget.accessToken,
+          accessToken: accessToken,
           data: data,
           photoPath: _profileImage?.path,
         );
@@ -96,7 +97,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         if (result["success"]) {
           setState(() {
             _driverInfo = result["data"];
-            _profileImage = null; // Clear after successful upload
+            _profileImage = null;
             _isEditing = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -104,8 +105,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(result["message"] ?? "Failed to update profile")),
+            SnackBar(content: Text(result["message"] ?? "Failed to update profile")),
           );
         }
       } catch (e) {
@@ -207,7 +207,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         key: GlobalKey<FormState>(),
                         child: Column(
                           children: [
-                            // Profile Header with image picker + plus icon
                             Stack(
                               children: [
                                 GestureDetector(
@@ -217,29 +216,18 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                                     backgroundColor: Colors.blueAccent,
                                     backgroundImage: _profileImage != null
                                         ? FileImage(_profileImage!)
-                                        : (_driverInfo!["profile_photo_url"] !=
-                                                null
-                                            ? NetworkImage(_driverInfo![
-                                                "profile_photo_url"])
+                                        : (_driverInfo!["profile_photo_url"] != null
+                                            ? NetworkImage(_driverInfo!["profile_photo_url"])
                                             : null) as ImageProvider?,
                                     child: (_profileImage == null &&
-                                            (_driverInfo![
-                                                        "profile_photo_url"] ==
-                                                    null ||
-                                                _driverInfo![
-                                                        "profile_photo_url"]
-                                                    .isEmpty))
+                                            (_driverInfo!["profile_photo_url"] == null ||
+                                                _driverInfo!["profile_photo_url"].isEmpty))
                                         ? Text(
-                                            (_driverInfo!["full_name"] !=
-                                                        null &&
-                                                    _driverInfo!["full_name"]
-                                                        .isNotEmpty)
-                                                ? _driverInfo!["full_name"][0]
-                                                    .toUpperCase()
+                                            (_driverInfo!["full_name"] != null &&
+                                                    _driverInfo!["full_name"].isNotEmpty)
+                                                ? _driverInfo!["full_name"][0].toUpperCase()
                                                 : "?",
-                                            style: const TextStyle(
-                                                fontSize: 40,
-                                                color: Colors.white),
+                                            style: const TextStyle(fontSize: 40, color: Colors.white),
                                           )
                                         : null,
                                   ),
@@ -276,17 +264,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             const SizedBox(height: 12),
                             Text(
                               _driverInfo!["full_name"] ?? "Not set",
-                              style: const TextStyle(
-                                  fontSize: 22, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               _driverInfo!["email"] ?? "Not set",
-                              style: const TextStyle(
-                                  fontSize: 16, color: Colors.grey),
+                              style: const TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                             const SizedBox(height: 20),
-                            // Info List
                             _buildInfoTile(
                               "Full Name",
                               _driverInfo!["full_name"] ?? "Not set",
@@ -351,16 +336,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blueAccent,
                                   foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   textStyle: const TextStyle(fontSize: 18),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                                 child: _isLoading
-                                    ? const CircularProgressIndicator(
-                                        color: Colors.white)
+                                    ? const CircularProgressIndicator(color: Colors.white)
                                     : const Text('Save Profile'),
                               ),
                             ],

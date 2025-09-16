@@ -1,7 +1,7 @@
 name: mobileapp
 description: A new Flutter project.
 
-publish_to: 'none' # Remove this line if you plan to publish the app
+publish_to: "none" # Remove this line if you plan to publish the app
 
 version: 1.0.0+1
 
@@ -20,6 +20,9 @@ dependencies:
   http: ^1.1.0
   shared_preferences: ^2.2.2
   image_picker: ^1.0.7
+  mime: ^1.0.4
+  dio: ^5.4.0
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -31,3 +34,4 @@ flutter:
 
   assets:
     - assets/images/
+    - .env

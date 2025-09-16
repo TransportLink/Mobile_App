@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 
 class UploadDocumentScreen extends StatefulWidget {
-  final String accessToken;
-  const UploadDocumentScreen({super.key, required this.accessToken});
+  const UploadDocumentScreen({super.key}); // Removed accessToken
 
   @override
   State<UploadDocumentScreen> createState() => _UploadDocumentScreenState();
@@ -40,8 +40,11 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        final prefs = await SharedPreferences.getInstance();
+        final accessToken =
+            prefs.getString('access_token') ?? ''; // Fetch token
         final result = await _authService.uploadDocument(
-          accessToken: widget.accessToken,
+          accessToken: accessToken,
           documentType: _documentType!,
           documentNumber: _documentNumberController.text,
           expiryDate: _expiryDateController.text,
@@ -53,7 +56,9 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? 'Failed to upload document')),
+            SnackBar(
+                content:
+                    Text(result['message'] ?? 'Failed to upload document')),
           );
         }
       } catch (e) {
@@ -85,7 +90,8 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
                   color: Colors.grey[200],
                   child: _documentFile == null
                       ? const Center(child: Text('Tap to select document'))
-                      : Image.file(File(_documentFile!.path), fit: BoxFit.cover),
+                      : Image.file(File(_documentFile!.path),
+                          fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: 16),
@@ -97,8 +103,15 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
                   filled: true,
                   fillColor: Colors.white,
                 ),
-                items: ['license', 'insurance', 'vehicle_registration', 'ID_card']
-                    .map((type) => DropdownMenuItem(value: type, child: Text(type.replaceAll('_', ' ').toUpperCase())))
+                items: [
+                  'license',
+                  'insurance',
+                  'vehicle_registration',
+                  'ID_card'
+                ]
+                    .map((type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type.replaceAll('_', ' ').toUpperCase())))
                     .toList(),
                 onChanged: (value) => setState(() => _documentType = value),
                 validator: (value) => value == null ? 'Required' : null,
@@ -123,10 +136,10 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
                   filled: true,
                   fillColor: Colors.white,
                 ),
-                validator: (value) =>
-                    value!.isEmpty || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
-                        ? 'Enter a valid date (YYYY-MM-DD)'
-                        : null,
+                validator: (value) => value!.isEmpty ||
+                        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)
+                    ? 'Enter a valid date (YYYY-MM-DD)'
+                    : null,
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -138,7 +151,8 @@ class _UploadDocumentScreenState extends State<UploadDocumentScreen> {
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator()
-                    : const Text('Upload Document', style: TextStyle(fontSize: 16)),
+                    : const Text('Upload Document',
+                        style: TextStyle(fontSize: 16)),
               ),
             ],
           ),

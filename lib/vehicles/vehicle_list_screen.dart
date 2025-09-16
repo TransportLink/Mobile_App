@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_vehicle_service.dart';
+import '../services/auth_service.dart';
 import 'vehicle_detail_screen.dart';
 import 'add_vehicle_screen.dart';
 
@@ -22,18 +22,17 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Future<void> _fetchVehicles() async {
-    try {
-      final vehicles = await _authService.listVehicles();
-      setState(() {
-        _vehicles = vehicles;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching vehicles: $e')),
-      );
-    }
+    final result = await _authService.listVehicles();
+    setState(() {
+      if (result['success']) {
+        _vehicles = result['data'];
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Error fetching vehicles')),
+        );
+      }
+      _isLoading = false;
+    });
   }
 
   @override
@@ -67,7 +66,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             MaterialPageRoute(
                               builder: (_) => VehicleDetailScreen(vehicleId: vehicle['vehicle_id']),
                             ),
-                          ).then((_) => _fetchVehicles()); // Refresh list after edit/delete
+                          ).then((_) => _fetchVehicles());
                         },
                       ),
                     );
@@ -78,7 +77,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const AddVehicleScreen()),
-          ).then((_) => _fetchVehicles()); // Refresh list after adding
+          ).then((_) => _fetchVehicles());
         },
         backgroundColor: Colors.white,
         foregroundColor: Colors.indigo,

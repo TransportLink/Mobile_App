@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'upload_document_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class DocumentListScreen extends StatefulWidget {
-  final String accessToken;
-  const DocumentListScreen({super.key, required this.accessToken});
+  const DocumentListScreen({super.key});
 
   @override
   State<DocumentListScreen> createState() => _DocumentListScreenState();
@@ -23,18 +21,17 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
   }
 
   Future<void> _fetchDocuments() async {
-    try {
-      final documents = await _authService.listDocuments(widget.accessToken);
-      setState(() {
-        _documents = documents;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching documents: $e')),
-      );
-    }
+    final result = await _authService.listDocuments();
+    setState(() {
+      if (result['success']) {
+        _documents = result['data'];
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Error fetching documents')),
+        );
+      }
+      _isLoading = false;
+    });
   }
 
   @override
@@ -78,9 +75,9 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => UploadDocumentScreen(accessToken: widget.accessToken),
+              builder: (_) => const UploadDocumentScreen(),
             ),
-          ).then((_) => _fetchDocuments()); // Refresh list after upload
+          ).then((_) => _fetchDocuments());
         },
         backgroundColor: Colors.white,
         foregroundColor: Colors.indigo,

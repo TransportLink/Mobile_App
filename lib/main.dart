@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:mobileapp/documents/document_list_screen.dart';
-
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
 import 'driver_home_screen.dart';
 import 'driver_profile_screen.dart';
 import 'driver_profile_setting.dart';
@@ -26,16 +26,21 @@ class Routes {
   static const documents = '/documents';
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Safer token setup: will use dart-define if passed, else fallback
-  const token = String.fromEnvironment(
-    "ACCESS_TOKEN",
-    defaultValue: "YOUR_MAPBOX_ACCESS_TOKEN", // <-- Replace with real token
-  );
+  // Load .env file
+  await dotenv.load(fileName: ".env");
 
-  MapboxOptions.setAccessToken(token);
+  // Retrieve Mapbox access token from .env
+  final mapboxToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? 'YOUR_MAPBOX_ACCESS_TOKEN';
+
+  if (mapboxToken == 'YOUR_MAPBOX_ACCESS_TOKEN') {
+    // ignore: avoid_print
+    print('Warning: Mapbox access token not set in .env file');
+  }
+
+  MapboxOptions.setAccessToken(mapboxToken);
   runApp(const MyApp());
 }
 
@@ -71,9 +76,8 @@ class MyApp extends StatelessWidget {
           case Routes.wallet:
             return MaterialPageRoute(builder: (_) => const WalletScreen());
           case Routes.profile:
-            final accessToken = settings.arguments as String? ?? '';
             return MaterialPageRoute(
-              builder: (_) => DriverProfileScreen(accessToken: accessToken),
+              builder: (_) => const DriverProfileScreen(),
             );
           case Routes.profileSetting:
             return MaterialPageRoute(
@@ -83,7 +87,7 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const VehicleListScreen());
           case Routes.documents:
             return MaterialPageRoute(
-              builder: (_) => DocumentListScreen(accessToken: ''),
+              builder: (_) => const DocumentListScreen(),
             );
           default:
             return MaterialPageRoute(builder: (_) => const OnboardingScreen());

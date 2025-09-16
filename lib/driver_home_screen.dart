@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:mobileapp/documents/document_list_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class DriverHomeScreen extends StatefulWidget {
@@ -22,6 +21,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return Scaffold(
       body: MapWidget(
         key: const ValueKey("mapWidget"),
+        styleUri: MapboxStyles.STANDARD, // Explicitly set Mapbox style
         onMapCreated: _onMapCreated,
       ),
       floatingActionButton: FloatingActionButton(
@@ -32,8 +32,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: Colors.green.shade700, // selected icon color
-        unselectedItemColor: Colors.grey, // unselected icon color
+        selectedItemColor: Colors.green.shade700,
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
           BottomNavigationBarItem(
@@ -61,16 +61,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     } else if (index == 2) {
       Navigator.pushNamed(context, '/vehicles');
     } else if (index == 3) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DocumentListScreen(
-            accessToken: '', // Will use SharedPreferences in AuthService
-          ),
-        ),
-      );
-    }
-    else if (index == 4) {
+      Navigator.pushNamed(context, '/documents');
+    } else if (index == 4) {
       Navigator.pushNamed(context, '/profile');
     }
   }
@@ -141,7 +133,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         MapAnimationOptions(duration: 1000),
       );
 
-      // Clear any old marker
+      // Clear any old markers
       await pointAnnotationManager?.deleteAll();
 
       // Add marker at current location
@@ -149,7 +141,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           await mapboxMap?.annotations.createPointAnnotationManager();
       await manager?.create(PointAnnotationOptions(
         geometry: center,
-        iconImage: "marker-15",
+        iconImage: "marker-15", // Ensure this icon exists in Mapbox style
         iconSize: 2.0,
       ));
 
