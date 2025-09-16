@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:mobileapp/documents/document_list_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class DriverHomeScreen extends StatefulWidget {
@@ -31,11 +32,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: Colors.green.shade700,
+        selectedItemColor: Colors.green.shade700, // selected icon color
+        unselectedItemColor: Colors.grey, // unselected icon color
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
           BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.directions_car), label: 'Vehicles'),
+          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Documents'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -54,6 +59,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (index == 1) {
       Navigator.pushNamed(context, '/wallet');
     } else if (index == 2) {
+      Navigator.pushNamed(context, '/vehicles');
+    } else if (index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DocumentListScreen(
+            accessToken: '', // Will use SharedPreferences in AuthService
+          ),
+        ),
+      );
+    }
+    else if (index == 4) {
       Navigator.pushNamed(context, '/profile');
     }
   }

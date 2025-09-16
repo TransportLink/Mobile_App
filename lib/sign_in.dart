@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-
-import 'driver_home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_service.dart';
 import 'sign_up.dart';
+import 'driver_home_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -15,6 +16,9 @@ class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscureText = true;
+  bool _isLoading = false;
+
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +48,10 @@ class _SignInScreenState extends State<SignInScreen> {
                   filled: true,
                   fillColor: Colors.white,
                 ),
-                validator: (value) => value == null || !value.contains('@')
-                    ? 'Enter a valid email'
-                    : null,
+                validator: (value) =>
+                    value == null || !value.contains('@')
+                        ? 'Enter a valid email'
+                        : null,
               ),
               const SizedBox(height: 20),
               TextFormField(
@@ -70,22 +75,32 @@ class _SignInScreenState extends State<SignInScreen> {
                     },
                   ),
                 ),
-                validator: (value) => value == null || value.length < 6
-                    ? 'Enter at least 6 characters'
-                    : null,
+                validator: (value) =>
+                    value == null || value.length < 6
+                        ? 'Enter at least 6 characters'
+                        : null,
               ),
               const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _handleSignIn,
+                  onPressed: _isLoading ? null : _handleSignIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.indigo,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.indigo,
+                          ),
+                        )
+                      : const Text('Sign In', style: TextStyle(fontSize: 16)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -93,7 +108,9 @@ class _SignInScreenState extends State<SignInScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const SignUpScreen(),
+                    ),
                   );
                 },
                 child: const Text(
@@ -115,15 +132,50 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  void _handleSignIn() {
+  Future<void> _handleSignIn() async {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signing in...')),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
-      );
+      setState(() => _isLoading = true);
+
+      try {
+        final result = await _authService.login(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+
+        setState(() => _isLoading = false);
+
+        if (result["success"] == true && result["data"]["access_token"] != null) {
+          final accessToken = result["data"]["access_token"];
+
+          // Store token
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('access_token', accessToken);
+
+          // Navigate to Driver Home
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const DriverHomeScreen(),
+            ),
+          );
+        } else {
+          // Show backend error or fallback
+          final errorMessage = result["message"] ?? "Invalid credentials. Please try again.";
+          _showErrorSnackBar(errorMessage);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        _showErrorSnackBar("Network error. Please check your connection.");
+      }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }
