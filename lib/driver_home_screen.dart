@@ -33,8 +33,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _isLoading = true;
   int _selectedIndex = 0;
   String? _driverId;
-  double _searchRadius = 1.0; // Default 1 km
+  double _searchRadius = 5.0; // Increased default to 5 km
   Timer? _locationUpdateTimer;
+  Timer? _busStopUpdateTimer;
 
   @override
   void initState() {
@@ -47,6 +48,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void dispose() {
     _locationUpdateTimer?.cancel();
+    _busStopUpdateTimer?.cancel();
     super.dispose();
   }
 
@@ -56,19 +58,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (profileResult['success']) {
       setState(() {
         _driverId = profileResult['data']['driver_id']?.toString();
+        print("✅ Driver ID: $_driverId");
       });
     } else {
+      print("❌ Error fetching driver profile: ${profileResult['message']}");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(profileResult['message'] ?? 'Error fetching driver profile')),
+        SnackBar(
+            content: Text(
+                profileResult['message'] ?? 'Error fetching driver profile')),
       );
     }
   }
 
   Future<void> _requestLocationPermission() async {
     var status = await Permission.locationWhenInUse.status;
+    print("ℹ️ Location permission status: $status");
     if (status.isDenied || status.isRestricted || status.isPermanentlyDenied) {
       status = await Permission.locationWhenInUse.request();
+      print("ℹ️ Requested permission, new status: $status");
       if (status.isDenied) {
+        print("❌ Location permission denied");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Location permission denied')),
         );
@@ -76,6 +85,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return;
       }
       if (status.isPermanentlyDenied) {
+        print("❌ Location permission permanently denied");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Location permission permanently denied'),
@@ -90,8 +100,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
     }
     if (status.isGranted) {
+      print("✅ Location permission granted");
       await _showUserLocation();
       await _fetchBusStops();
+      await _startBusStopUpdates(); // Start polling after initial fetch
     }
     setState(() => _isLoading = false);
   }
@@ -110,6 +122,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         String address = addressResult['success']
             ? addressResult['data']['features'][0]['properties']['name']
             : 'Unknown';
+        print(
+            "📍 Updating location: ${position.latitude}, ${position.longitude}, address: $address");
         final result = await _driverLocationService.updateDriverLocation(
           latitude: position.latitude,
           longitude: position.longitude,
@@ -127,47 +141,96 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     });
   }
 
+  Future<void> _startBusStopUpdates() async {
+    if (_busStopUpdateTimer != null) {
+      print("ℹ️ Bus stop update timer already running");
+      return;
+    }
+    if (mapboxMap == null) {
+      print("❌ Mapbox map not initialized, delaying bus stop polling");
+      // Wait for map initialization
+      await Future.doWhile(() async {
+        await Future.delayed(const Duration(milliseconds: 500));
+        return mapboxMap == null;
+      });
+      print("✅ Mapbox map initialized, starting bus stop polling");
+    }
+    _busStopUpdateTimer =
+        Timer.periodic(const Duration(seconds: 30), (timer) async {
+      if (_currentDestination != null) {
+        print("ℹ️ Skipping bus stop update during active trip");
+        return;
+      }
+      try {
+        print("📡 Starting periodic bus stop update");
+        await _fetchBusStops();
+      } catch (e) {
+        print("❌ Error in periodic bus stop update: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update bus stops')),
+        );
+      }
+    });
+  }
+
   Future<void> _fetchBusStops() async {
+    if (mapboxMap == null) {
+      print("❌ Mapbox map not initialized, skipping bus stop fetch");
+      return;
+    }
     try {
       final position = await geo.Geolocator.getCurrentPosition(
         desiredAccuracy: geo.LocationAccuracy.high,
       );
+      print(
+          "📍 Fetching bus stops for lat: ${position.latitude}, lon: ${position.longitude}, radius: $_searchRadius");
       final result = await _mapService.fetchBusStops(
         latitude: position.latitude,
         longitude: position.longitude,
         radius: _searchRadius,
       );
+      print("📡 API response: $result");
       if (result['success']) {
         final features = result['data']['features'] as List<dynamic>;
+        print("🚌 Found ${features.length} bus stops");
         setState(() {
           _busStops = features.map((f) => BusStop.fromJson(f)).toList();
         });
         await _addBusStopMarkers();
       } else {
+        print("❌ API error: ${result['message']}");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Error fetching bus stops')),
+          SnackBar(
+              content: Text(result['message'] ?? 'Error fetching bus stops')),
         );
       }
     } catch (e) {
       print("❌ Error fetching bus stops: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to fetch bus stops')),
+      );
     }
   }
 
   Future<void> _addBusStopMarkers() async {
+    print("🛠️ Adding ${_busStops.length} bus stop markers");
     await pointAnnotationManager?.deleteAll();
     final manager = await mapboxMap?.annotations.createPointAnnotationManager();
     for (var stop in _busStops) {
+      print(
+          "🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude})");
       await manager?.create(PointAnnotationOptions(
         geometry: mapbox.Point(
           coordinates: mapbox.Position(stop.longitude, stop.latitude),
         ),
-        iconImage: 'bus-stop-icon', // Ensure this exists in Mapbox style
+        iconImage: 'marker', // Use default 'marker' to ensure rendering
         iconSize: 1.5,
         textField: stop.systemId,
         textOffset: [0.0, -2.0],
       ));
     }
     pointAnnotationManager = manager;
+    print("✅ Finished adding markers");
   }
 
   Future<void> _showUserLocation() async {
@@ -183,10 +246,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         MapAnimationOptions(duration: 1000),
       );
       await pointAnnotationManager?.deleteAll();
-      final manager = await mapboxMap?.annotations.createPointAnnotationManager();
+      final manager =
+          await mapboxMap?.annotations.createPointAnnotationManager();
       await manager?.create(PointAnnotationOptions(
         geometry: center,
-        iconImage: 'driver-icon', // Ensure this exists in Mapbox style
+        iconImage: 'marker', // Use default 'marker' to ensure rendering
         iconSize: 2.0,
       ));
       pointAnnotationManager = manager;
@@ -302,7 +366,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final routeResult = await _mapService.fetchRoute(
       driverId: _driverId!,
       destination: stop.destinations.keys.first,
-      systemId: stop.systemId,
+      systemId: stop.systemId
     );
     if (routeResult['success']) {
       setState(() {
@@ -324,13 +388,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(destinationResult['message'] ?? 'Error accepting trip'),
+            content:
+                Text(destinationResult['message'] ?? 'Error accepting trip'),
           ),
         );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(routeResult['message'] ?? 'Error fetching route')),
+        SnackBar(
+            content: Text(routeResult['message'] ?? 'Error fetching route')),
       );
     }
   }
@@ -353,7 +419,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? 'Error updating destination')),
+        SnackBar(
+            content: Text(result['message'] ?? 'Error updating destination')),
       );
     }
   }
@@ -396,12 +463,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   void _onMapCreated(mapbox.MapboxMap mapboxMap) {
     this.mapboxMap = mapboxMap;
+    print("🗺️ Map created");
     mapboxMap.location.updateSettings(
       LocationComponentSettings(
         enabled: true,
-        pulsingEnabled: true,
+        pulsingEnabled: false, // Disabled to reduce visual clutter
         puckBearingEnabled: true,
-        showAccuracyRing: true,
+        showAccuracyRing: false, // Disabled to reduce visual clutter
       ),
     );
   }
@@ -416,21 +484,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             styleUri: MapboxStyles.STANDARD,
             onMapCreated: _onMapCreated,
             onTapListener: (context) {
-              final latitude = context.point.coordinates.lat.toDouble();;
-              final longitude = context.point.coordinates.lng.toDouble();;
+              final latitude = context.point.coordinates.lat.toDouble();
+              final longitude = context.point.coordinates.lng.toDouble();
               print("OnTap coordinate: {$longitude, $latitude} " +
                   "point: {x: ${context.touchPosition.x}, y: ${context.touchPosition.y}}");
               final tappedStop = _busStops.firstWhereOrNull((stop) {
-                return _isPointNearCoordinates(
+                final isNear = _isPointNearCoordinates(
                   stop.latitude,
                   stop.longitude,
                   latitude,
                   longitude,
-                  tolerance: 0.001,
+                  tolerance: 0.005,
                 );
+                print("Checking stop ${stop.systemId}: isNear=$isNear");
+                return isNear;
               });
               if (tappedStop != null) {
+                print("✅ Tapped stop: ${tappedStop.systemId}");
                 _showBusStopDialog(tappedStop);
+              } else {
+                print("❌ No stop tapped");
               }
             },
           ),
@@ -479,10 +552,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             right: 16,
             child: DropdownButton<double>(
               value: _searchRadius,
-              items: [1.0, 2.0].map((r) => DropdownMenuItem(
-                value: r,
-                child: Text('$r km'),
-              )).toList(),
+              items: [1.0, 2.0, 5.0, 10.0]
+                  .map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text('$r km'),
+                      ))
+                  .toList(),
               onChanged: (value) {
                 setState(() => _searchRadius = value!);
                 _fetchBusStops();
@@ -514,7 +589,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  bool _isPointNearCoordinates(double lat1, double lon1, double lat2, double lon2, {double tolerance = 0.001}) {
+  bool _isPointNearCoordinates(
+      double lat1, double lon1, double lat2, double lon2,
+      {double tolerance = 0.005}) {
+    print("Comparing ($lat1, $lon1) to ($lat2, $lon2)");
     return (lat1 - lat2).abs() < tolerance && (lon1 - lon2).abs() < tolerance;
   }
 }

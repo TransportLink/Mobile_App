@@ -2,7 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DriverLocationService {
-  final String baseUrl = 'https://trotro-hailing-authentication-servi.vercel.app';
+  final String baseUrl =
+      'https://trotro-hailing-authentication-servi.vercel.app';
   final Dio _dio;
 
   DriverLocationService() : _dio = Dio() {
@@ -34,7 +35,8 @@ class DriverLocationService {
                   final newRefreshToken = response.data['refresh_token'];
                   await prefs.setString('access_token', newAccessToken);
                   await prefs.setString('refresh_token', newRefreshToken);
-                  e.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                  e.requestOptions.headers['Authorization'] =
+                      'Bearer $newAccessToken';
                   final retryResponse = await _dio.fetch(e.requestOptions);
                   return handler.resolve(retryResponse);
                 }
@@ -68,13 +70,15 @@ class DriverLocationService {
           'address': address,
         },
       );
-      print("🟢 Update Location Response: ${response.statusCode} -> ${response.data}");
+      print(
+          "🟢 Update Location Response: ${response.statusCode} -> ${response.data}");
       if (response.statusCode == 201) {
         return {"success": true, "data": response.data};
       } else {
         return {
           "success": false,
-          "message": _extractErrorMessage(response.data, response.statusCode ?? 500)
+          "message":
+              _extractErrorMessage(response.data, response.statusCode ?? 500)
         };
       }
     } on DioException catch (e) {
@@ -109,13 +113,15 @@ class DriverLocationService {
           'availability_status': availabilityStatus,
         },
       );
-      print("🟢 Create Destination Response: ${response.statusCode} -> ${response.data}");
+      print(
+          "🟢 Create Destination Response: ${response.statusCode} -> ${response.data}");
       if (response.statusCode == 201) {
         return {"success": true, "data": response.data};
       } else {
         return {
           "success": false,
-          "message": _extractErrorMessage(response.data, response.statusCode ?? 500)
+          "message":
+              _extractErrorMessage(response.data, response.statusCode ?? 500)
         };
       }
     } on DioException catch (e) {
@@ -133,13 +139,15 @@ class DriverLocationService {
   Future<Map<String, dynamic>> listDestinations(String driverId) async {
     try {
       final response = await _dio.get('/destinations/$driverId');
-      print("🟣 List Destinations Response: ${response.statusCode} -> ${response.data}");
+      print(
+          "🟣 List Destinations Response: ${response.statusCode} -> ${response.data}");
       if (response.statusCode == 200) {
         return {"success": true, "data": response.data};
       } else {
         return {
           "success": false,
-          "message": _extractErrorMessage(response.data, response.statusCode ?? 500)
+          "message":
+              _extractErrorMessage(response.data, response.statusCode ?? 500)
         };
       }
     } on DioException catch (e) {
@@ -154,19 +162,22 @@ class DriverLocationService {
     }
   }
 
-  Future<Map<String, dynamic>> updateDestination(String destinationId, String availabilityStatus) async {
+  Future<Map<String, dynamic>> updateDestination(
+      String destinationId, String availabilityStatus) async {
     try {
       final response = await _dio.patch(
         '/destinations/$destinationId',
         data: {'availability_status': availabilityStatus},
       );
-      print("🟢 Update Destination Response: ${response.statusCode} -> ${response.data}");
+      print(
+          "🟢 Update Destination Response: ${response.statusCode} -> ${response.data}");
       if (response.statusCode == 200) {
         return {"success": true, "data": response.data};
       } else {
         return {
           "success": false,
-          "message": _extractErrorMessage(response.data, response.statusCode ?? 500)
+          "message":
+              _extractErrorMessage(response.data, response.statusCode ?? 500)
         };
       }
     } on DioException catch (e) {
