@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:collection/collection.dart';
+import 'package:mobileapp/utils/helpers.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
@@ -15,6 +13,8 @@ import '../services/map_service.dart';
 import '../models/bus_stop.dart';
 import '../models/route.dart' as route_models;
 import '../models/destination.dart';
+import '../utils/map_utils.dart';
+import '../utils/ui_components.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -26,10 +26,11 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen>
     with SingleTickerProviderStateMixin {
   mapbox.MapboxMap? mapboxMap;
-  PointAnnotationManager? pointAnnotationManager;
+  mapbox.PointAnnotationManager? pointAnnotationManager;
   final MapService _mapService = MapService();
   final AuthService _authService = AuthService();
   final DriverLocationService _driverLocationService = DriverLocationService();
+  final MapUtils _mapUtils = MapUtils();
   List<BusStop> _busStops = [];
   route_models.Route? _currentRoute;
   Destination? _currentDestination;
@@ -124,7 +125,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     }
     if (status.isGranted) {
       print("✅ Location permission granted");
-      await _showUserLocation();
+      await _mapUtils.showUserLocation(
+          mapboxMap, pointAnnotationManager, context);
       await _fetchBusStops();
       await _startBusStopUpdates();
     }
@@ -209,8 +211,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                     (stop) => stop.systemId == _selectedBusStop!.systemId);
               }
             });
-            await _addBusStopMarkers();
-            await _fitMapToBounds(position);
+            await _mapUtils.addBusStopMarkers(
+                mapboxMap, pointAnnotationManager, _busStops, context);
+            await _mapUtils.fitMapToBounds(mapboxMap, position, _busStops);
           }
         } catch (e) {
           print("❌ Error in periodic bus stop update: $e");
@@ -254,16 +257,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           setState(() {
             _currentRoute = route_models.Route.fromJson(routeResult['data']);
           });
-          await _showRoute(_currentRoute!);
+          await _mapUtils.showRoute(mapboxMap, _currentRoute!, context);
           await mapboxMap?.flyTo(
-            CameraOptions(
+            mapbox.CameraOptions(
               center: mapbox.Point(
                 coordinates:
                     mapbox.Position(position.longitude, position.latitude),
               ),
               zoom: 14.0,
             ),
-            MapAnimationOptions(duration: 1000),
+            mapbox.MapAnimationOptions(duration: 1000),
           );
         }
       } catch (e) {
@@ -302,8 +305,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   (stop) => stop.systemId == _selectedBusStop!.systemId);
             }
           });
-          await _addBusStopMarkers();
-          await _fitMapToBounds(position);
+          await _mapUtils.addBusStopMarkers(
+              mapboxMap, pointAnnotationManager, _busStops, context);
+          await _mapUtils.fitMapToBounds(mapboxMap, position, _busStops);
           return;
         } else {
           print("❌ API error: ${result['message']}");
@@ -337,289 +341,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Failed to fetch bus stops after retries')),
     );
-  }
-
-  Future<void> _addBusStopMarkers() async {
-    print("🛠️ Adding ${_busStops.length} bus stop markers");
-    await pointAnnotationManager?.deleteAll();
-    final manager = await mapboxMap?.annotations.createPointAnnotationManager();
-    if (manager == null) {
-      print("❌ Failed to create PointAnnotationManager");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to create marker manager')),
-      );
-      return;
-    }
-    // Load the custom image for bus stops
-    final ByteData bytes = await rootBundle.load('assets/images/bus_stop.png');
-    final Uint8List imageData = bytes.buffer.asUint8List();
-
-    for (var stop in _busStops) {
-      try {
-        print(
-            "🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude}) with ${stop.totalCount} passengers");
-        await manager.create(PointAnnotationOptions(
-          geometry: mapbox.Point(
-            coordinates: mapbox.Position(stop.longitude, stop.latitude),
-          ),
-          image: imageData,
-          iconSize: 0.5,
-          textField: stop.totalCount?.toString() ?? '0',
-          textOffset: [0.0, -2.0],
-          textColor: Colors.blue.value,
-          textHaloColor: Colors.white.value,
-          textHaloWidth: 2.0,
-          textSize: 16.0,
-        ));
-      } catch (e) {
-        print("❌ Failed to add marker for ${stop.systemId}: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to add marker for ${stop.systemId}: $e')),
-        );
-      }
-    }
-    pointAnnotationManager = manager;
-    print("✅ Finished adding markers");
-  }
-
-  Future<void> _showUserLocation() async {
-    try {
-      final position = await geo.Geolocator.getCurrentPosition(
-        desiredAccuracy: geo.LocationAccuracy.high,
-      );
-      final center = mapbox.Point(
-        coordinates: mapbox.Position(position.longitude, position.latitude),
-      );
-      await pointAnnotationManager?.deleteAll();
-      final manager =
-          await mapboxMap?.annotations.createPointAnnotationManager();
-      if (manager == null) {
-        print("❌ Failed to create PointAnnotationManager for user location");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create marker manager')),
-        );
-        return;
-      }
-      // Load the custom image for driver location
-      // final ByteData bytes =
-      //     await rootBundle.load('assets/images/driver_location.png');
-      // final Uint8List imageData = bytes.buffer.asUint8List();
-      await manager.create(PointAnnotationOptions(
-        geometry: center,
-        // image: imageData,
-        iconSize: 0.6,
-      ));
-      pointAnnotationManager = manager;
-      print(
-          "📍 User location marker added: ${position.latitude}, ${position.longitude}");
-      await _fitMapToBounds(position);
-    } catch (e) {
-      print("❌ Error showing user location: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to show user location')),
-      );
-    }
-  }
-
-  Future<void> _fitMapToBounds(geo.Position position) async {
-    if (mapboxMap == null) {
-      print("❌ Mapbox map not initialized, skipping fit bounds");
-      return;
-    }
-
-    if (_busStops.isEmpty) {
-      // If no bus stops, center on driver location
-      await mapboxMap?.flyTo(
-        CameraOptions(
-          center: mapbox.Point(
-            coordinates: mapbox.Position(position.longitude, position.latitude),
-          ),
-          zoom: 14.0,
-        ),
-        MapAnimationOptions(duration: 1000),
-      );
-      print(
-          "✅ Map centered on driver location: (${position.longitude}, ${position.latitude})");
-      return;
-    }
-
-    // Sort bus stops by distance from driver location
-    final sortedBusStops = _busStops
-      ..sort((a, b) {
-        final distanceA = geo.Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          a.latitude,
-          a.longitude,
-        );
-        final distanceB = geo.Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          b.latitude,
-          b.longitude,
-        );
-        return distanceA.compareTo(distanceB);
-      });
-
-    // Take up to 5 closest bus stops
-    final closestStops = sortedBusStops.take(5).toList();
-    final coordinates = [
-      [position.longitude, position.latitude],
-      ...closestStops.map((stop) => [stop.longitude, stop.latitude]),
-    ];
-
-    // Calculate bounds
-    double minLon = coordinates[0][0];
-    double maxLon = coordinates[0][0];
-    double minLat = coordinates[0][1];
-    double maxLat = coordinates[0][1];
-    for (var coord in coordinates) {
-      minLon = minLon < coord[0] ? minLon : coord[0];
-      maxLon = maxLon > coord[0] ? maxLon : coord[0];
-      minLat = minLat < coord[1] ? minLat : coord[1];
-      maxLat = maxLat > coord[1] ? maxLat : coord[1];
-    }
-
-    // Calculate center and zoom level
-    final centerLon = (minLon + maxLon) / 2;
-    final centerLat = (minLat + maxLat) / 2;
-    final latDelta = (maxLat - minLat).abs();
-    final lonDelta = (maxLon - minLon).abs();
-    final maxDelta = latDelta > lonDelta ? latDelta : lonDelta;
-
-    // Calculate zoom level based on the maximum delta (approximate)
-    double zoomLevel;
-    if (maxDelta < 0.005) {
-      zoomLevel = 15.0; // Close zoom for small areas
-    } else if (maxDelta < 0.02) {
-      zoomLevel = 14.0; // Medium zoom
-    } else if (maxDelta < 0.05) {
-      zoomLevel = 13.0; // Wider area
-    } else {
-      zoomLevel = 12.0; // Very wide area
-    }
-
-    // Add padding by slightly expanding the bounds
-    const padding = 0.005; // Approx 500m in degrees at mid-latitudes
-    minLat -= padding;
-    maxLat += padding;
-    minLon -= padding;
-    maxLon += padding;
-
-    await mapboxMap?.flyTo(
-      CameraOptions(
-        center: mapbox.Point(
-          coordinates: mapbox.Position(centerLon, centerLat),
-        ),
-        zoom: zoomLevel,
-      ),
-      MapAnimationOptions(duration: 1000),
-    );
-    print(
-        "✅ Map fitted to bounds: center=($centerLon, $centerLat), zoom=$zoomLevel, bounds=[($minLon, $minLat), ($maxLon, $maxLat)]");
-  }
-
-  Future<void> _showRoute(route_models.Route route) async {
-    try {
-      if (route.coordinates == null) {
-        print("❌ Route coordinates are null");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Route coordinates are missing')),
-        );
-        return;
-      }
-      final geoJsonData = {
-        'type': 'FeatureCollection',
-        'features': [
-          {
-            'type': 'Feature',
-            'geometry': {
-              'type': 'LineString',
-              'coordinates': route.coordinates,
-            },
-            'properties': {'color': '#FF0000', 'width': 4.0},
-          },
-        ],
-      };
-      final jsonString = jsonEncode(geoJsonData);
-
-      final style = mapboxMap?.style;
-      if (style != null) {
-        final layers = await style.getStyleLayers();
-        final sources = await style.getStyleSources();
-        if (layers.any((layer) => layer?.id == 'route-line-layer')) {
-          await style.removeStyleLayer('route-line-layer');
-          print("✅ Removed existing route-line-layer");
-        }
-        if (sources.any((source) => source?.id == 'route-line-source')) {
-          await style.removeStyleSource('route-line-source');
-          print("✅ Removed existing route-line-source");
-        }
-      }
-
-      await mapboxMap?.style.addSource(
-        GeoJsonSource(id: 'route-line-source', data: jsonString),
-      );
-      await mapboxMap?.style.addLayer(
-        LineLayer(
-          id: 'route-line-layer',
-          sourceId: 'route-line-source',
-          lineJoin: LineJoin.ROUND,
-          lineCap: LineCap.ROUND,
-          lineOpacity: 0.7,
-          lineColor: Colors.red.value,
-          lineWidth: 8.0,
-        ),
-      );
-
-      final bounds = _calculateBounds(route.coordinates!);
-      await mapboxMap?.flyTo(
-        CameraOptions(
-          center: mapbox.Point(
-            coordinates: mapbox.Position(
-              (bounds[0][0] + bounds[1][0]) / 2,
-              (bounds[0][1] + bounds[1][1]) / 2,
-            ),
-          ),
-          zoom: 13.0,
-        ),
-        MapAnimationOptions(duration: 1000),
-      );
-      print("✅ Route displayed");
-      setState(() {});
-    } catch (e) {
-      print("❌ Error showing route: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to show route: $e')),
-      );
-    }
-  }
-
-  List<List<double>> _calculateBounds(List<List<double>> coordinates) {
-    double minLon = coordinates[0][0];
-    double maxLon = coordinates[0][0];
-    double minLat = coordinates[0][1];
-    double maxLat = coordinates[0][1];
-    for (var coord in coordinates) {
-      minLon = minLon < coord[0] ? minLon : coord[0];
-      maxLon = maxLon > coord[0] ? maxLon : coord[0];
-      minLat = minLat < coord[1] ? minLat : coord[1];
-      maxLat = maxLat > coord[1] ? maxLat : coord[1];
-    }
-    return [
-      [minLon, minLat],
-      [maxLon, maxLat]
-    ];
-  }
-
-  void _showBusStopDialog(BusStop stop) {
-    setState(() {
-      _selectedBusStop = stop;
-      _isTripCardMinimized = false;
-    });
-    print("ℹ️ Showing bus stop dialog for ${stop.systemId}");
-    _animationController?.forward();
   }
 
   Future<void> _acceptTrip(BusStop stop) async {
@@ -670,7 +391,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       _selectedBusStop = null;
       _isTripCardMinimized = false;
     });
-    await _showRoute(_currentRoute!);
+    await _mapUtils.showRoute(mapboxMap, _currentRoute!, context);
     await mapboxMap?.flyTo(
       CameraOptions(
         center: mapbox.Point(
@@ -750,7 +471,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _currentBusStopId = null;
         _isTripCardMinimized = false;
       });
-      await _clearRouteLayer();
+      await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrived at destination')),
       );
@@ -768,7 +489,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _currentBusStopId = null;
         _isTripCardMinimized = false;
       });
-      await _clearRouteLayer();
+      await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrived at destination')),
       );
@@ -792,7 +513,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _currentBusStopId = null;
         _isTripCardMinimized = false;
       });
-      await _clearRouteLayer();
+      await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Trip cancelled')),
       );
@@ -810,7 +531,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _currentBusStopId = null;
         _isTripCardMinimized = false;
       });
-      await _clearRouteLayer();
+      await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Trip cancelled')),
       );
@@ -820,26 +541,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result['message'] ?? 'Error cancelling trip')),
       );
-    }
-  }
-
-  Future<void> _clearRouteLayer() async {
-    try {
-      final style = mapboxMap?.style;
-      if (style != null) {
-        final layers = await style.getStyleLayers();
-        final sources = await style.getStyleSources();
-        if (layers.any((layer) => layer?.id == 'route-line-layer')) {
-          await style.removeStyleLayer('route-line-layer');
-          print("✅ Removed route-line-layer");
-        }
-        if (sources.any((source) => source?.id == 'route-line-source')) {
-          await style.removeStyleSource('route-line-source');
-          print("✅ Removed route-line-source");
-        }
-      }
-    } catch (e) {
-      print("❌ Error clearing route layer: $e");
     }
   }
 
@@ -860,11 +561,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     this.mapboxMap = mapboxMap;
     print("🗺️ Map created");
     try {
-      // Initialize PointAnnotationManager
       pointAnnotationManager =
           await mapboxMap.annotations.createPointAnnotationManager();
-
-      // Update location puck settings with pulsing effect
       mapboxMap.location.updateSettings(
         LocationComponentSettings(
           enabled: true,
@@ -896,14 +594,37 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     Widget bottomSheetChild;
     if (_selectedBusStop != null) {
       print("ℹ️ Rendering bus stop card for ${_selectedBusStop!.systemId}");
-      bottomSheetChild = _buildBusStopCard(_selectedBusStop!);
+      bottomSheetChild = UIComponents.buildBusStopCard(
+        _selectedBusStop!,
+        () {
+          setState(() => _selectedBusStop = null);
+          _animationController?.reverse();
+        },
+        () => _acceptTrip(_selectedBusStop!),
+      );
     } else if (_currentDestination != null) {
       if (_isTripCardMinimized) {
         print("ℹ️ Rendering minimized trip card");
-        bottomSheetChild = _buildMinimizedTripCard();
+        bottomSheetChild = UIComponents.buildMinimizedTripCard(
+          _currentDestination!,
+          _currentRoute,
+          _currentBusStopId,
+          _busStops,
+          () {
+            setState(() => _isTripCardMinimized = false);
+            _animationController?.forward();
+          },
+        );
       } else {
         print("ℹ️ Rendering full trip card");
-        bottomSheetChild = _buildTripCard();
+        bottomSheetChild = UIComponents.buildTripCard(
+          _currentDestination!,
+          _currentRoute,
+          _currentBusStopId,
+          _busStops,
+          _arrivedAtDestination,
+          _cancelTrip,
+        );
       }
     } else {
       print("ℹ️ No trip or bus stop selected, hiding bottom sheet");
@@ -922,20 +643,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               final longitude = context.point.coordinates.lng.toDouble();
               print(
                   "OnTap coordinate: {$longitude, $latitude} point: {x: ${context.touchPosition.x}, y: ${context.touchPosition.y}}");
-              final tappedStop = _busStops.firstWhereOrNull((stop) {
-                final isNear = _isPointNearCoordinates(
-                  stop.latitude,
-                  stop.longitude,
-                  latitude,
-                  longitude,
-                  tolerance: 0.005,
-                );
-                print("Checking stop ${stop.systemId}: isNear=$isNear");
-                return isNear;
-              });
+              final tappedStop = _busStops
+                  .firstWhereOrNull((stop) => Helpers.isPointNearCoordinates(
+                        stop.latitude,
+                        stop.longitude,
+                        latitude,
+                        longitude,
+                        tolerance: 0.005,
+                      ));
               if (tappedStop != null) {
                 print("✅ Tapped stop: ${tappedStop.systemId}");
-                _showBusStopDialog(tappedStop);
+                setState(() {
+                  _selectedBusStop = tappedStop;
+                  _isTripCardMinimized = false;
+                });
+                _animationController?.forward();
               } else if (_currentDestination != null) {
                 print(
                     "ℹ️ Tapped outside during active trip, toggling minimization");
@@ -993,10 +715,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             child: DropdownButton<double>(
               value: _searchRadius,
               items: [1.0, 2.0, 5.0, 10.0]
-                  .map((r) => DropdownMenuItem(
-                        value: r,
-                        child: Text('$r km'),
-                      ))
+                  .map((r) => DropdownMenuItem(value: r, child: Text('$r km')))
                   .toList(),
               onChanged: (value) {
                 setState(() => _searchRadius = value!);
@@ -1008,7 +727,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Recenter & Show Marker',
-        onPressed: _showUserLocation,
+        onPressed: () => _mapUtils.showUserLocation(
+            mapboxMap, pointAnnotationManager, context),
         child: const Icon(Icons.my_location),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -1027,349 +747,5 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         ],
       ),
     );
-  }
-
-  Widget _buildBusStopCard(BusStop stop) {
-    print("ℹ️ Building bus stop card for ${stop.systemId}");
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                stop.systemId,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  setState(() {
-                    _selectedBusStop = null;
-                  });
-                  _animationController?.reverse();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.people, color: Colors.blue, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Total Passengers: ${stop.totalCount ?? 0}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Destinations:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView(
-              children: stop.destinations.entries.map((e) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${e.value ?? 0}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          e.key,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedBusStop = null;
-                  });
-                  _animationController?.reverse();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade300,
-                  foregroundColor: Colors.black87,
-                ),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => _acceptTrip(stop),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Accept'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTripCard() {
-    final passengerCount = _currentBusStopId != null
-        ? _busStops
-                .firstWhereOrNull((stop) => stop.systemId == _currentBusStopId)
-                ?.totalCount ??
-            0
-        : 0;
-    print(
-        "ℹ️ Building trip card: route=${_currentDestination?.routeName}, passengers=$passengerCount");
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _currentDestination != null
-                ? 'Trip to ${_currentDestination!.routeName}'
-                : 'Trip in progress',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_currentRoute != null) ...[
-            Row(
-              children: [
-                const Icon(Icons.timer, color: Colors.blue, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  'ETA: ${(_currentRoute!.eta / 60).toStringAsFixed(1)} min',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.directions, color: Colors.blue, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  'Distance: ${(_currentRoute!.distance / 1000).toStringAsFixed(1)} km',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.people, color: Colors.blue, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  'Passengers: $passengerCount',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ],
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: _arrivedAtDestination,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Arrived'),
-              ),
-              ElevatedButton(
-                onPressed: _cancelTrip,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMinimizedTripCard() {
-    final passengerCount = _currentBusStopId != null
-        ? _busStops
-                .firstWhereOrNull((stop) => stop.systemId == _currentBusStopId)
-                ?.totalCount ??
-            0
-        : 0;
-    print(
-        "ℹ️ Building minimized trip card: route=${_currentDestination?.routeName}, passengers=$passengerCount");
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _isTripCardMinimized = false;
-        });
-        _animationController?.forward();
-      },
-      child: Card(
-        elevation: 8.0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        margin: const EdgeInsets.all(8.0),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade100, Colors.green.shade100],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16.0),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Tooltip(
-                    message: 'Current Trip',
-                    child: Row(
-                      children: [
-                        Icon(Icons.route,
-                            color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 4),
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 100),
-                          child: Text(
-                            _currentDestination != null
-                                ? _currentDestination!.routeName
-                                : 'Trip in progress',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (_currentRoute != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Tooltip(
-                      message: 'Estimated Time',
-                      child: Row(
-                        children: [
-                          Icon(Icons.timer,
-                              color: Colors.green.shade700, size: 20),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${(_currentRoute!.eta / 60).toStringAsFixed(1)} min',
-                            style: const TextStyle(
-                                fontSize: 14, color: Colors.black87),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (_currentRoute != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Tooltip(
-                      message: 'Distance',
-                      child: Row(
-                        children: [
-                          Icon(Icons.straighten,
-                              color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${(_currentRoute!.distance / 1000).toStringAsFixed(1)} km',
-                            style: const TextStyle(
-                                fontSize: 14, color: Colors.black87),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Tooltip(
-                    message: 'Passengers',
-                    child: Row(
-                      children: [
-                        Icon(Icons.people,
-                            color: Colors.green.shade700, size: 20),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$passengerCount',
-                          style: const TextStyle(
-                              fontSize: 14, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Icon(
-                    Icons.arrow_upward,
-                    color: Colors.blue.shade700,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  bool _isPointNearCoordinates(
-      double lat1, double lon1, double lat2, double lon2,
-      {double tolerance = 0.005}) {
-    print("Comparing ($lat1, $lon1) to ($lat2, $lon2)");
-    return (lat1 - lat2).abs() < tolerance && (lon1 - lon2).abs() < tolerance;
   }
 }
