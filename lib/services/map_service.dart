@@ -66,11 +66,12 @@ class MapService {
   Future<Map<String, dynamic>> fetchRoute({
     required String driverId,
     required String destination,
-    required String systemId, 
+    required String systemId,
+    required double destLat,
+    required double destLng, required double startLat, required double startLng,
   }) async {
     try {
-      final apiKey = dotenv.env['MAP_SERVICE_API_KEY'] ??
-          'MshsAdSLMPHpWfOYKSX6LROHv1FBmOZpHZ_ofiZIij8';
+      final apiKey = dotenv.env['MAP_SERVICE_API_KEY'] ?? '';
       if (apiKey.isEmpty) {
         print("❌ MAP_SERVICE_API_KEY is missing in .env");
         return {
@@ -78,19 +79,37 @@ class MapService {
           "message": "API key is missing. Please check your configuration."
         };
       }
+
+      // 🔑 Get stored access token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('access_token') ?? '';
+
+      if (accessToken.isEmpty) {
+        print("❌ Access token missing");
+        return {"success": false, "message": "Access token missing."};
+      }
+
       print(
-          "📡 Sending request to /routes with driver_id: $driverId, destination: $destination, system_id: $systemId");
+          "📡 Sending request to /routes with driver_id: $driverId, destination: $destination, system_id: $systemId, dest_lat: $destLat, dest_lng: $destLng");
+
       final response = await _dio.get(
         '/routes',
         queryParameters: {
           'driver_id': driverId,
           'destination': destination,
           'system_id': systemId,
+          'dest_lat': destLat,
+          'dest_lng': destLng,
         },
-        options: Options(headers: {'X-API-KEY': apiKey}),
+        options: Options(headers: {
+          'X-API-KEY': apiKey,
+          'Authorization': 'Bearer $accessToken',
+        }),
       );
+
       print(
           "🟣 Fetch Route Response: ${response.statusCode} -> ${response.data}");
+
       if (response.statusCode == 200) {
         return {"success": true, "data": response.data};
       } else {
@@ -101,15 +120,20 @@ class MapService {
         };
       }
     } on DioException catch (e) {
+      String errorMessage;
       if (e.type == DioExceptionType.connectionTimeout) {
-        print("❌ Fetch Route Timeout: $e");
-        return {
-          "success": false,
-          "message": "Request timed out. Please check your internet connection."
-        };
+        errorMessage =
+            "Request timed out. Please check your internet connection.";
+      } else if (e.response?.statusCode == 401) {
+        errorMessage = "Unauthorized. Please log in again.";
+      } else if (e.response?.statusCode == 403) {
+        errorMessage = "Forbidden. You don’t have permission.";
+      } else {
+        errorMessage = _extractErrorMessage(
+            e.response?.data, e.response?.statusCode ?? 500);
       }
       print("❌ Fetch Route Error: $e");
-      return {"success": false, "message": "Unexpected error: $e"};
+      return {"success": false, "message": errorMessage};
     }
   }
 
@@ -192,4 +216,3 @@ class MapService {
     }
   }
 }
-

@@ -70,26 +70,38 @@ class DriverLocationService {
           'address': address,
         },
       );
+
       print(
           "🟢 Update Location Response: ${response.statusCode} -> ${response.data}");
-      if (response.statusCode == 201) {
-        return {"success": true, "data": response.data};
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          "success": true,
+          "message": response.data['message'] ?? "Location updated",
+          "data": response.data,
+        };
       } else {
         return {
           "success": false,
-          "message":
-              _extractErrorMessage(response.data, response.statusCode ?? 500)
+          "message": _extractErrorMessage(
+            response.data,
+            response.statusCode ?? 500,
+          ),
         };
       }
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionTimeout) {
         return {
           "success": false,
-          "message": "Request timed out. Please check your internet connection."
+          "message":
+              "Request timed out. Please check your internet connection.",
         };
       }
       print("❌ Update Location Error: $e");
-      return {"success": false, "message": "Unexpected error: $e"};
+      return {
+        "success": false,
+        "message": "Unexpected error: ${e.message}",
+      };
     }
   }
 
