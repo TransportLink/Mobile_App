@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -43,8 +44,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   AnimationController? _animationController;
   Animation<Offset>? _slideAnimation;
   BusStop? _selectedBusStop;
-  String? _currentBusStopId; // To track passenger count for active trip
-  bool _isTripCardMinimized = false; // To toggle minimized trip card
+  String? _currentBusStopId;
+  bool _isTripCardMinimized = false;
 
   @override
   void initState() {
@@ -209,6 +210,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               }
             });
             await _addBusStopMarkers();
+            await _fitMapToBounds(position);
           }
         } catch (e) {
           print("❌ Error in periodic bus stop update: $e");
@@ -301,6 +303,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             }
           });
           await _addBusStopMarkers();
+          await _fitMapToBounds(position);
           return;
         } else {
           print("❌ API error: ${result['message']}");
@@ -347,18 +350,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       );
       return;
     }
+    // Load the custom image for bus stops
+    final ByteData bytes = await rootBundle.load('assets/images/bus_stop.png');
+    final Uint8List imageData = bytes.buffer.asUint8List();
+
     for (var stop in _busStops) {
       try {
         print(
-            "🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude})");
+            "🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude}) with ${stop.totalCount} passengers");
         await manager.create(PointAnnotationOptions(
           geometry: mapbox.Point(
             coordinates: mapbox.Position(stop.longitude, stop.latitude),
           ),
-          iconImage: _useCustomMarker ? 'blue-marker' : 'marker',
-          iconSize: 1.5,
-          textField: stop.systemId,
+          image: imageData,
+          iconSize: 0.5,
+          textField: stop.totalCount?.toString() ?? '0',
           textOffset: [0.0, -2.0],
+          textColor: Colors.blue.value,
+          textHaloColor: Colors.white.value,
+          textHaloWidth: 2.0,
+          textSize: 16.0,
         ));
       } catch (e) {
         print("❌ Failed to add marker for ${stop.systemId}: $e");
@@ -380,10 +391,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       final center = mapbox.Point(
         coordinates: mapbox.Position(position.longitude, position.latitude),
       );
-      await mapboxMap?.flyTo(
-        CameraOptions(center: center, zoom: 14.0),
-        MapAnimationOptions(duration: 1000),
-      );
       await pointAnnotationManager?.deleteAll();
       final manager =
           await mapboxMap?.annotations.createPointAnnotationManager();
@@ -394,20 +401,123 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         );
         return;
       }
+      // Load the custom image for driver location
+      // final ByteData bytes =
+      //     await rootBundle.load('assets/images/driver_location.png');
+      // final Uint8List imageData = bytes.buffer.asUint8List();
       await manager.create(PointAnnotationOptions(
         geometry: center,
-        iconImage: _useCustomMarker ? 'blue-marker' : 'marker',
-        iconSize: 2.0,
+        // image: imageData,
+        iconSize: 0.6,
       ));
       pointAnnotationManager = manager;
       print(
           "📍 User location marker added: ${position.latitude}, ${position.longitude}");
+      await _fitMapToBounds(position);
     } catch (e) {
       print("❌ Error showing user location: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to show user location')),
       );
     }
+  }
+
+  Future<void> _fitMapToBounds(geo.Position position) async {
+    if (mapboxMap == null) {
+      print("❌ Mapbox map not initialized, skipping fit bounds");
+      return;
+    }
+
+    if (_busStops.isEmpty) {
+      // If no bus stops, center on driver location
+      await mapboxMap?.flyTo(
+        CameraOptions(
+          center: mapbox.Point(
+            coordinates: mapbox.Position(position.longitude, position.latitude),
+          ),
+          zoom: 14.0,
+        ),
+        MapAnimationOptions(duration: 1000),
+      );
+      print(
+          "✅ Map centered on driver location: (${position.longitude}, ${position.latitude})");
+      return;
+    }
+
+    // Sort bus stops by distance from driver location
+    final sortedBusStops = _busStops
+      ..sort((a, b) {
+        final distanceA = geo.Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          a.latitude,
+          a.longitude,
+        );
+        final distanceB = geo.Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          b.latitude,
+          b.longitude,
+        );
+        return distanceA.compareTo(distanceB);
+      });
+
+    // Take up to 5 closest bus stops
+    final closestStops = sortedBusStops.take(5).toList();
+    final coordinates = [
+      [position.longitude, position.latitude],
+      ...closestStops.map((stop) => [stop.longitude, stop.latitude]),
+    ];
+
+    // Calculate bounds
+    double minLon = coordinates[0][0];
+    double maxLon = coordinates[0][0];
+    double minLat = coordinates[0][1];
+    double maxLat = coordinates[0][1];
+    for (var coord in coordinates) {
+      minLon = minLon < coord[0] ? minLon : coord[0];
+      maxLon = maxLon > coord[0] ? maxLon : coord[0];
+      minLat = minLat < coord[1] ? minLat : coord[1];
+      maxLat = maxLat > coord[1] ? maxLat : coord[1];
+    }
+
+    // Calculate center and zoom level
+    final centerLon = (minLon + maxLon) / 2;
+    final centerLat = (minLat + maxLat) / 2;
+    final latDelta = (maxLat - minLat).abs();
+    final lonDelta = (maxLon - minLon).abs();
+    final maxDelta = latDelta > lonDelta ? latDelta : lonDelta;
+
+    // Calculate zoom level based on the maximum delta (approximate)
+    double zoomLevel;
+    if (maxDelta < 0.005) {
+      zoomLevel = 15.0; // Close zoom for small areas
+    } else if (maxDelta < 0.02) {
+      zoomLevel = 14.0; // Medium zoom
+    } else if (maxDelta < 0.05) {
+      zoomLevel = 13.0; // Wider area
+    } else {
+      zoomLevel = 12.0; // Very wide area
+    }
+
+    // Add padding by slightly expanding the bounds
+    const padding = 0.005; // Approx 500m in degrees at mid-latitudes
+    minLat -= padding;
+    maxLat += padding;
+    minLon -= padding;
+    maxLon += padding;
+
+    await mapboxMap?.flyTo(
+      CameraOptions(
+        center: mapbox.Point(
+          coordinates: mapbox.Position(centerLon, centerLat),
+        ),
+        zoom: zoomLevel,
+      ),
+      MapAnimationOptions(duration: 1000),
+    );
+    print(
+        "✅ Map fitted to bounds: center=($centerLon, $centerLat), zoom=$zoomLevel, bounds=[($minLon, $minLat), ($maxLon, $maxLat)]");
   }
 
   Future<void> _showRoute(route_models.Route route) async {
@@ -506,7 +616,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   void _showBusStopDialog(BusStop stop) {
     setState(() {
       _selectedBusStop = stop;
-      _isTripCardMinimized = false; // Ensure trip card is not minimized
+      _isTripCardMinimized = false;
     });
     print("ℹ️ Showing bus stop dialog for ${stop.systemId}");
     _animationController?.forward();
@@ -540,65 +650,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       startLng: position.longitude,
     );
     print("🟣 Full Fetch Route Response: $routeResult");
-    if (routeResult['success']) {
-      setState(() {
-        _currentRoute = route_models.Route.fromJson(routeResult['data']);
-        _currentBusStopId = stop.systemId; // Store for passenger updates
-        _selectedBusStop = null; // Switch to trip card
-        _isTripCardMinimized = false; // Show full trip card
-      });
-      await _showRoute(_currentRoute!);
-      await mapboxMap?.flyTo(
-        CameraOptions(
-          center: mapbox.Point(
-            coordinates: mapbox.Position(position.longitude, position.latitude),
-          ),
-          zoom: 14.0,
-        ),
-        MapAnimationOptions(duration: 1000),
-      );
-      final destinationResult = await _driverLocationService.createDestination(
-        routeName: '${stop.systemId} to ${stop.destinations.keys.first}',
-        startLatitude: position.latitude,
-        startLongitude: position.longitude,
-        endLatitude: stop.latitude,
-        endLongitude: stop.longitude,
-        availabilityStatus: 'available',
-      );
-      print("🟣 Full Create Destination Response: $destinationResult");
-      if (destinationResult['success']) {
-        print("✅ Setting _currentDestination: ${destinationResult['data']}");
-        setState(() {
-          _currentDestination = Destination.fromJson(destinationResult['data']);
-          print("✅ _currentDestination set: ${_currentDestination?.routeName}");
-        });
-        // Ensure animation is reset and then forwarded
-        if (_animationController != null) {
-          print("ℹ️ Resetting and forwarding animation for trip card");
-          await _animationController!.reverse();
-          await _animationController!.forward();
-        } else {
-          print("❌ Animation controller is null");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Animation controller error')),
-          );
-        }
-        _startRouteUpdates();
-      } else {
-        print(
-            "❌ Failed to create destination: ${destinationResult['message']}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(destinationResult['message'] ?? 'Error accepting trip')),
-        );
-        setState(() {
-          _selectedBusStop = null;
-          _isTripCardMinimized = false;
-        });
-        await _animationController?.reverse();
-      }
-    } else {
+    if (!routeResult['success']) {
       print("❌ Failed to fetch route: ${routeResult['message']}");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -609,7 +661,83 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _isTripCardMinimized = false;
       });
       await _animationController?.reverse();
+      return;
     }
+
+    setState(() {
+      _currentRoute = route_models.Route.fromJson(routeResult['data']);
+      _currentBusStopId = stop.systemId;
+      _selectedBusStop = null;
+      _isTripCardMinimized = false;
+    });
+    await _showRoute(_currentRoute!);
+    await mapboxMap?.flyTo(
+      CameraOptions(
+        center: mapbox.Point(
+          coordinates: mapbox.Position(position.longitude, position.latitude),
+        ),
+        zoom: 14.0,
+      ),
+      MapAnimationOptions(duration: 1000),
+    );
+
+    final destinationResult = await _driverLocationService.createDestination(
+      routeName: '${stop.systemId} to ${stop.destinations.keys.first}',
+      startLatitude: position.latitude,
+      startLongitude: position.longitude,
+      endLatitude: stop.latitude,
+      endLongitude: stop.longitude,
+      availabilityStatus: 'available',
+    );
+    print("🟣 Full Create Destination Response: $destinationResult");
+    if (!destinationResult['success']) {
+      print("❌ Failed to create destination: ${destinationResult['message']}");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text(destinationResult['message'] ?? 'Error accepting trip')),
+      );
+      setState(() {
+        _selectedBusStop = null;
+        _isTripCardMinimized = false;
+        _currentRoute = null;
+        _currentBusStopId = null;
+      });
+      await _animationController?.reverse();
+      return;
+    }
+
+    try {
+      setState(() {
+        _currentDestination = Destination.fromJson(destinationResult['data']);
+        print("✅ _currentDestination set: ${_currentDestination?.routeName}");
+      });
+    } catch (e) {
+      print("❌ Error parsing destination: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error parsing destination data')),
+      );
+      setState(() {
+        _selectedBusStop = null;
+        _isTripCardMinimized = false;
+        _currentRoute = null;
+        _currentBusStopId = null;
+      });
+      await _animationController?.reverse();
+      return;
+    }
+
+    if (_animationController != null) {
+      print("ℹ️ Resetting and forwarding animation for trip card");
+      _animationController!.reset();
+      await _animationController!.forward();
+    } else {
+      print("❌ Animation controller is null");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Animation controller error')),
+      );
+    }
+    _startRouteUpdates();
   }
 
   Future<void> _arrivedAtDestination() async {
@@ -732,63 +860,54 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     this.mapboxMap = mapboxMap;
     print("🗺️ Map created");
     try {
-      final byteData = await rootBundle.load('assets/images/bus_stop.png');
-      final bytes = byteData.buffer.asUint8List();
-      final image = mapbox.MbxImage(
-        width: 64,
-        height: 64,
-        data: bytes,
+      // Initialize PointAnnotationManager
+      pointAnnotationManager =
+          await mapboxMap.annotations.createPointAnnotationManager();
+
+      // Update location puck settings with pulsing effect
+      mapboxMap.location.updateSettings(
+        LocationComponentSettings(
+          enabled: true,
+          pulsingEnabled: true,
+          pulsingColor: Colors.blue.value,
+          pulsingMaxRadius: 100.0,
+          puckBearingEnabled: true,
+          showAccuracyRing: false,
+        ),
       );
-      await mapboxMap.style.addStyleImage(
-        'blue-marker',
-        1.0,
-        image,
-        true,
-        [],
-        [],
-        null,
-      );
-      print("✅ Added blue-marker to map style");
-      setState(() {
-        _useCustomMarker = true;
-      });
     } catch (e) {
-      print("❌ Failed to load or add blue-marker image: $e");
+      print("❌ Error in onMapCreated: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load marker image: $e')),
+        SnackBar(content: Text('Error initializing map: $e')),
       );
-      print("ℹ️ Falling back to default 'marker'");
       setState(() {
         _useCustomMarker = false;
       });
     }
-    mapboxMap.location.updateSettings(
-      LocationComponentSettings(
-        enabled: true,
-        pulsingEnabled: false,
-        puckBearingEnabled: true,
-        showAccuracyRing: false,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final safePadding = MediaQuery.of(context).padding.bottom;
     print(
         "ℹ️ Building UI: _selectedBusStop=${_selectedBusStop?.systemId}, _currentDestination=${_currentDestination?.routeName}, _isTripCardMinimized=$_isTripCardMinimized");
 
-    // Determine which widget to render and log the appropriate message
     Widget bottomSheetChild;
     if (_selectedBusStop != null) {
       print("ℹ️ Rendering bus stop card for ${_selectedBusStop!.systemId}");
       bottomSheetChild = _buildBusStopCard(_selectedBusStop!);
-    } else if (_isTripCardMinimized) {
-      print("ℹ️ Rendering minimized trip card");
-      bottomSheetChild = _buildMinimizedTripCard();
+    } else if (_currentDestination != null) {
+      if (_isTripCardMinimized) {
+        print("ℹ️ Rendering minimized trip card");
+        bottomSheetChild = _buildMinimizedTripCard();
+      } else {
+        print("ℹ️ Rendering full trip card");
+        bottomSheetChild = _buildTripCard();
+      }
     } else {
-      print("ℹ️ Rendering full trip card");
-      bottomSheetChild = _buildTripCard();
+      print("ℹ️ No trip or bus stop selected, hiding bottom sheet");
+      bottomSheetChild = const SizedBox.shrink();
     }
 
     return Scaffold(
@@ -842,19 +961,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           if (_isLoading) const Center(child: CircularProgressIndicator()),
           if (_selectedBusStop != null || _currentDestination != null)
             Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
+              bottom: safePadding + 56.0,
+              left: 16.0,
               child: SlideTransition(
                 position: _slideAnimation!,
-                child: Container(
-                  height: _isTripCardMinimized
-                      ? screenHeight * 0.15
-                      : screenHeight * 0.5,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  width: _isTripCardMinimized
+                      ? 300.0
+                      : MediaQuery.of(context).size.width - 32.0,
+                  height: _isTripCardMinimized ? 80.0 : screenHeight * 0.5,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.2),
@@ -1118,6 +1238,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         : 0;
     print(
         "ℹ️ Building minimized trip card: route=${_currentDestination?.routeName}, passengers=$passengerCount");
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -1125,51 +1246,121 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         });
         _animationController?.forward();
       },
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _currentDestination != null
-                        ? _currentDestination!.routeName
-                        : 'Trip in progress',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (_currentRoute != null) ...[
-                    Text(
-                      'ETA: ${(_currentRoute!.eta / 60).toStringAsFixed(1)} min',
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    Text(
-                      'Dist: ${(_currentRoute!.distance / 1000).toStringAsFixed(1)} km',
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                  Text(
-                    'Pass: $passengerCount',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
+      child: Card(
+        elevation: 8.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        margin: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade100, Colors.green.shade100],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Icon(
-              Icons.arrow_upward,
-              color: Colors.blue.shade700,
-              size: 24,
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Tooltip(
+                    message: 'Current Trip',
+                    child: Row(
+                      children: [
+                        Icon(Icons.route,
+                            color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 4),
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 100),
+                          child: Text(
+                            _currentDestination != null
+                                ? _currentDestination!.routeName
+                                : 'Trip in progress',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_currentRoute != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Tooltip(
+                      message: 'Estimated Time',
+                      child: Row(
+                        children: [
+                          Icon(Icons.timer,
+                              color: Colors.green.shade700, size: 20),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(_currentRoute!.eta / 60).toStringAsFixed(1)} min',
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_currentRoute != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Tooltip(
+                      message: 'Distance',
+                      child: Row(
+                        children: [
+                          Icon(Icons.straighten,
+                              color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(_currentRoute!.distance / 1000).toStringAsFixed(1)} km',
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Tooltip(
+                    message: 'Passengers',
+                    child: Row(
+                      children: [
+                        Icon(Icons.people,
+                            color: Colors.green.shade700, size: 20),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$passengerCount',
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Icon(
+                    Icons.arrow_upward,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -24,10 +24,14 @@ class Destination {
       destinationId: json['destination_id'] ?? '',
       driverId: json['driver_id'] ?? '',
       routeName: json['route_name'] ?? '',
-      startLatitude: json['start_latitude']?.toDouble() ?? 0.0,
-      startLongitude: json['start_longitude']?.toDouble() ?? 0.0,
-      endLatitude: json['end_latitude']?.toDouble() ?? 0.0,
-      endLongitude: json['end_longitude']?.toDouble() ?? 0.0,
+      startLatitude:
+          double.tryParse(json['start_latitude']?.toString() ?? '') ?? 0.0,
+      startLongitude:
+          double.tryParse(json['start_longitude']?.toString() ?? '') ?? 0.0,
+      endLatitude:
+          double.tryParse(json['end_latitude']?.toString() ?? '') ?? 0.0,
+      endLongitude:
+          double.tryParse(json['end_longitude']?.toString() ?? '') ?? 0.0,
       availabilityStatus: json['availability_status'] ?? 'not_available',
     );
   }
