@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobileapp/core/theme/app_palette.dart';
+import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:mobileapp/features/home/view/pages/auth_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final container = ProviderContainer();
+  await container.read(authViewmodelProvider.notifier).initSharedPreferences();
 
-  runApp(MyApp());
+  runApp(
+    UncontrolledProviderScope(container: container, child: MyApp()),
+  );
 }
 
 class MyApp extends StatelessWidget {

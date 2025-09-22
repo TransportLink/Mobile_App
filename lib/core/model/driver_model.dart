@@ -65,15 +65,15 @@ class DriverModel {
 
   factory DriverModel.fromMap(Map<String, dynamic> map) {
     return DriverModel(
-      id: map['id'] as String,
-      full_name: map['full_name'] as String,
+      id: map['id'] ?? '',
+      full_name: map['full_name'] ?? '',
       email: map['email'] as String,
-      password: map['password'] as String,
-      phone_number: map['phone_number'] as String,
-      date_of_birth: map['date_of_birth'] as String,
-      license_number: map['license_number'] as String,
-      license_expiry: map['license_expiry'] as String,
-      national_id: map['national_id'] as String,
+      password: map['password'] ?? '',
+      phone_number: map['phone_number'] ?? '',
+      date_of_birth: map['date_of_birth'] ?? '',
+      license_number: map['license_number'] ?? '',
+      license_expiry: map['license_expiry'] ?? '',
+      national_id: map['national_id'] ?? '',
     );
   }
 

@@ -16,10 +16,11 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       appBar: AppBar(centerTitle: true, title: Text("Sign In")),
       body: Container(
-        margin: EdgeInsets.fromLTRB(10, 0, 10, 10),
+        margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
         child: Form(
           key: formKey,
           child: Column(
