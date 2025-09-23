@@ -42,27 +42,23 @@ class DriverViewModel extends _$DriverViewModel {
     print(val.value);
   }
 
-    Future<void> listDocuments({
-    required String documentType,
-    required String documentNumber,
-    required String expiryDate,
-    String? documentPath,
-  }) async {
-    state = AsyncValue.loading();
+  //   Future<void> listDocuments({
+  //   required String documentType,
+  //   required String documentNumber,
+  //   required String expiryDate,
+  //   String? documentPath,
+  // }) async {
+  //   state = AsyncValue.loading();
 
-    final accessToken = _authLocalRepository.getToken('access_token');
-    final res = await _driverRepository.uploadDocument(
-        documentType: documentType,
-        documentNumber: documentNumber,
-        expiryDate: expiryDate,
-        accessToken: accessToken!);
+  //   final accessToken = _authLocalRepository.getToken('access_token');
+  //   final res = await _driverRepository.listDocuments();
 
-    final val = switch (res) {
-      Left(value: final l) => state =
-          AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final r) => state = AsyncValue.data(r)
-    };
+  //   final val = switch (res) {
+  //     Left(value: final l) => state =
+  //         AsyncValue.error(l.message, StackTrace.current),
+  //     Right(value: final r) => state = AsyncValue.data(r)
+  //   };
 
-    print(val.value);
-  }
+  //   print(val.value);
+  // }
 }

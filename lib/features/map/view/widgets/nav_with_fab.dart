@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobileapp/features/auth/view/pages/profile_page.dart';
-import 'package:mobileapp/features/driver/view/document_page.dart';
+import 'package:mobileapp/features/driver/view/driver_documents_page.dart';
 import 'package:mobileapp/features/driver/view/vehicle_page.dart';
 import 'package:mobileapp/features/driver/view/wallet_page.dart';
 import 'package:mobileapp/features/map/view/pages/map_page.dart';
@@ -20,7 +20,7 @@ class _NavWithFabState extends State<NavWithFab> {
     WalletPage(),
     VehiclePage(),
     MapPage(),
-    DocumentPage(),
+    DriverDocumentsPage(),
     ProfilePage()
   ];
 
