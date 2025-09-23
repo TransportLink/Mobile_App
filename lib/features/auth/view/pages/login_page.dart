@@ -6,11 +6,10 @@ import 'package:mobileapp/core/widgets/custom_field.dart';
 import 'package:mobileapp/core/widgets/loader.dart';
 import 'package:mobileapp/features/auth/view/widgets/inactive_button.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
-import 'package:mobileapp/features/home/view/pages/home_page.dart';
-import 'package:mobileapp/features/map/view/pages/map_page.dart';
+import 'package:mobileapp/main_screen.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
   _LoginPageState createState() => _LoginPageState();
@@ -41,7 +40,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           data: (data) {
             showSnackBar(context, "Welcome back ${data.full_name}!");
             Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const MapPage()));
+                MaterialPageRoute(builder: (context) => const MainScreen()));
           },
           error: (error, stackTrace) {
             showSnackBar(context, error.toString());
@@ -53,34 +52,36 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       appBar: AppBar(centerTitle: true, title: Text("Sign In")),
       body: isLoading
           ? Loader()
-          : SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    spacing: 12,
-                    children: [
-                      const SizedBox(
-                        height: 12,
-                      ),
-                      Image.asset(
-                        "assets/images/welcome.png",
-                        fit: BoxFit.cover,
-                      ),
-                      CustomField(
-                          label: "Email address",
-                          textEditingController: emailController,
-                          icon: Icon(Icons.email),
-                          hintText: "e.g, abc@email.com"),
-                      CustomField(
-                          label: "Password",
-                          textEditingController: passwordController,
-                          icon: Icon(Icons.password),
-                          isObscureText: true,
-                          hintText: "e.g, John Doe"),
-                    ],
+          : SafeArea(
+              child: SingleChildScrollView(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      spacing: 12,
+                      children: [
+                        const SizedBox(
+                          height: 12,
+                        ),
+                        Image.asset(
+                          "assets/images/welcome.png",
+                          fit: BoxFit.cover,
+                        ),
+                        CustomField(
+                            label: "Email address",
+                            textEditingController: emailController,
+                            icon: Icon(Icons.email),
+                            hintText: "e.g, abc@email.com"),
+                        CustomField(
+                            label: "Password",
+                            textEditingController: passwordController,
+                            icon: Icon(Icons.password),
+                            isObscureText: true,
+                            hintText: "e.g, John Doe"),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -17,7 +17,7 @@ MapRepository mapRepository(Ref ref) {
 
 class MapRepository {
   final String baseUrl = ServerConstants.baseUrl;
-  final Dio _dio = new Dio();
+  final Dio _dio = Dio();
 
   MapRepository() {
     _dio.options.baseUrl = baseUrl;

@@ -145,7 +145,9 @@ class MapViewModel extends _$MapViewModel {
         Timer.periodic(const Duration(seconds: 15), (_) async {
       final currentState = state!.value;
       if (currentState?.currentDestination == null ||
-          currentState?.driverId == null) return;
+          currentState?.driverId == null) {
+        return;
+      }
 
       try {
         final pos = await geo.Geolocator.getCurrentPosition(

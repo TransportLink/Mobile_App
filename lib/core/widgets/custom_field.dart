@@ -3,15 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 class CustomField extends StatelessWidget {
   const CustomField(
-      {Key? key,
+      {super.key,
       required this.label,
       required this.textEditingController,
       required this.hintText,
       required this.icon,
       this.validation,
       this.onTap,
-      this.isObscureText = false})
-      : super(key: key);
+      this.isObscureText = false});
 
   final String label;
   final String hintText;

@@ -1,12 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:mobileapp/features/auth/utils/auth_utils.dart';
 
 /// REFRESH TOKEN
-Future<Map<String, dynamic>> refreshToken(String refreshToken, Dio _dio) async {
+Future<Map<String, dynamic>> refreshToken(String refreshToken, Dio dio) async {
   try {
-    final response = await _dio.post(
+    final response = await dio.post(
       '/auth/refresh',
       data: {'refresh_token': refreshToken},
     );

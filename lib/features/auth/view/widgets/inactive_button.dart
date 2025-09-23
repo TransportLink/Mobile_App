@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobileapp/core/widgets/app_button.dart';
 
 class InactiveButton extends StatelessWidget {
-  const InactiveButton(this.text, {Key? key}) : super(key: key);
+  const InactiveButton(this.text, {super.key});
 
   final String text;
 

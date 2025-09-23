@@ -53,26 +53,27 @@ class CustomTheme {
       appBarTheme: AppBarThemeData().copyWith(
         backgroundColor: AppPalette.backgroundColor,
         titleTextStyle: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w600,
-            color: AppPalette.activeColorBackground,
-            fontSize: 24),
+            fontWeight: FontWeight.w600, color: Colors.black, fontSize: 24),
       ),
       textTheme: ThemeData.light().textTheme.copyWith(
           bodyLarge: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400,
-              color: AppPalette.activeColorBackground),
+            fontWeight: FontWeight.w400,
+            color: Colors.black,
+          ),
           bodyMedium: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400,
-              color: AppPalette.activeColorBackground),
+            fontWeight: FontWeight.w400,
+            color: Colors.black,
+          ),
           bodySmall: GoogleFonts.bricolageGrotesque(
               fontWeight: FontWeight.w400, color: Colors.black),
           labelMedium: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400,
-              color: AppPalette.activeColorBackground),
+            fontWeight: FontWeight.w400,
+            color: Colors.black,
+          ),
           titleLarge: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400,
-              color: AppPalette.activeColorBackground),
+            fontWeight: FontWeight.w400,
+            color: Colors.black,
+          ),
           titleMedium: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400,
-              color: AppPalette.activeColorBackground)));
+              fontWeight: FontWeight.w400, color: Colors.black)));
 }

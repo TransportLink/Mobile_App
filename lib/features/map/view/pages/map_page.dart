@@ -11,7 +11,7 @@ import 'package:mobileapp/features/map/utils/map_utils.dart';
 import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
 
 class MapPage extends ConsumerStatefulWidget {
-  const MapPage({Key? key}) : super(key: key);
+  const MapPage({super.key});
 
   @override
   _MapPageState createState() => _MapPageState();
@@ -111,27 +111,11 @@ class _MapPageState extends ConsumerState<MapPage>
       orElse: () => null as BusStop,
     );
 
-    if (tappedStop != null) {
-      setState(() {
-        _selectedBusStop = tappedStop;
-        _isTripCardMinimized = false;
-      });
-      _animationController?.forward();
-    } else if (currentDestination != null) {
-      setState(() {
-        _selectedBusStop = null;
-        _isTripCardMinimized = !_isTripCardMinimized;
-      });
-      _isTripCardMinimized
-          ? _animationController?.reverse()
-          : _animationController?.forward();
-    } else {
-      setState(() {
-        _selectedBusStop = null;
-        _isTripCardMinimized = false;
-      });
-      _animationController?.reverse();
-    }
+    setState(() {
+      _selectedBusStop = tappedStop;
+      _isTripCardMinimized = false;
+    });
+    _animationController?.forward();
   }
 
   void _onItemTapped(int index) {
@@ -143,9 +127,9 @@ class _MapPageState extends ConsumerState<MapPage>
     final bool isLoading =
         ref.watch(mapViewModelProvider.select((val) => val?.isLoading)) == true;
 
-    var busStops;
-    var currentDestination;
-    var currentRoute;
+    List<BusStop> busStops = [];
+    Destination? currentDestination;
+    route_models.Route? currentRoute;
 
     ref.listen(mapViewModelProvider, (_, next) {
       next?.when(
@@ -155,88 +139,73 @@ class _MapPageState extends ConsumerState<MapPage>
         ),
         data: (driver) {
           busStops = driver.busStops ?? [];
-          currentDestination = driver?.currentDestination;
-          currentRoute = driver?.currentRoute;
+          currentDestination = driver.currentDestination;
+          currentRoute = driver.currentRoute;
         },
       );
     });
 
     return Scaffold(
-      body: isLoading
-          ? Loader()
-          : Stack(
-              children: [
-                MapWidget(
-                  key: const ValueKey("mapWidget"),
-                  styleUri: MapboxStyles.STANDARD,
-                  onMapCreated: _onMapCreated,
-                  onTapListener: (context) =>
-                      _handleMapTap(context, busStops, currentDestination),
-                ),
+        body: isLoading
+            ? Loader()
+            : Stack(
+                children: [
+                  MapWidget(
+                    key: const ValueKey("mapWidget"),
+                    styleUri: MapboxStyles.STANDARD,
+                    onMapCreated: _onMapCreated,
+                    onTapListener: (context) =>
+                        _handleMapTap(context, busStops, currentDestination),
+                  ),
 
-                // Trip card
-                if (_selectedBusStop != null || currentDestination != null)
-                  Positioned(
-                    bottom: MediaQuery.of(context).padding.bottom + 56.0,
-                    left: 16.0,
-                    child: SlideTransition(
-                      position: _slideAnimation!,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        width: _isTripCardMinimized
-                            ? 300.0
-                            : MediaQuery.of(context).size.width - 32.0,
-                        height: _isTripCardMinimized
-                            ? 80.0
-                            : MediaQuery.of(context).size.height * 0.5,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, -2),
+                  // Trip card
+                  if (_selectedBusStop != null || currentDestination != null)
+                    Positioned(
+                      bottom: MediaQuery.of(context).padding.bottom + 56.0,
+                      left: 16.0,
+                      child: SlideTransition(
+                        position: _slideAnimation!,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          width: _isTripCardMinimized
+                              ? 300.0
+                              : MediaQuery.of(context).size.width - 32.0,
+                          height: _isTripCardMinimized
+                              ? 80.0
+                              : MediaQuery.of(context).size.height * 0.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, -2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              currentDestination != null
+                                  ? "Active trip to ${currentDestination!.routeName}"
+                                  : "Bus stop: ${_selectedBusStop?.systemId ?? ''}",
                             ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            currentDestination != null
-                                ? "Active trip to ${currentDestination.routeName}"
-                                : "Bus stop: ${_selectedBusStop?.systemId ?? ''}",
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Recenter & Show Marker',
-        onPressed: () => _mapUtils.showUserLocation(
-          mapboxMap,
-          pointAnnotationManager,
-          context,
-        ),
-        child: const Icon(Icons.my_location),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.green.shade700,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.directions_car), label: 'Vehicles'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Documents'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
-    );
+                ],
+              ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: Colors.white,
+          tooltip: 'Recenter & Show Marker',
+          onPressed: () => _mapUtils.showUserLocation(
+            mapboxMap,
+            pointAnnotationManager,
+            context,
+          ),
+          child: const Icon(Icons.my_location),
+        ));
   }
 }

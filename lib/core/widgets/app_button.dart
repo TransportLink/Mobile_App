@@ -50,7 +50,10 @@ class AppButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           gradient: LinearGradient(
               colors: gradientColors ??
-                  [Colors.black, Colors.black.withOpacity(0.8)]),
+                  [
+                    Colors.black.withOpacity(0.9),
+                    Colors.black.withOpacity(0.7)
+                  ]),
         ),
         child: Align(
           alignment: Alignment.center,

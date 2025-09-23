@@ -108,7 +108,6 @@ class AuthRemoteRepository {
         return Left(AppFailure(
             "Request timed out. Please check your internet connection."));
       }
-      ;
 
       print("❌ Login Error: ${e.toString()}");
 
