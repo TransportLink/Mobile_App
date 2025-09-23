@@ -5,6 +5,7 @@ import 'package:mobileapp/core/widgets/app_button.dart';
 import 'package:mobileapp/core/widgets/custom_field.dart';
 import 'package:mobileapp/core/widgets/loader.dart';
 import 'package:mobileapp/features/auth/view/pages/login_page.dart';
+import 'package:mobileapp/features/auth/view/widgets/inactive_button.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 
 class SignupPage extends ConsumerStatefulWidget {
@@ -154,11 +155,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
         height: 72,
         color: Colors.white,
         child: isLoading
-            ? AppButton(
-                text: "Create an account",
-                onTap: () {},
-                active: false,
-              )
+            ? InactiveButton("Create an account")
             : AppButton(
                 text: "Create an account",
                 onTap: () async {

@@ -81,7 +81,7 @@ class AuthRemoteRepository {
   }
 
   /// LOGIN: Stores both access and refresh tokens
-  Future<Either<AppFailure, Map<String, String>>> login(
+  Future<Either<AppFailure, Map<String, dynamic>>> login(
       String email, String password) async {
     final body = {
       "identifier": email,
@@ -94,10 +94,10 @@ class AuthRemoteRepository {
       print("Login Body Sent: $body");
       print("Login Response: ${response.statusCode} -> ${response.data}");
 
-      final data = jsonDecode(response.data);
+      final data = response.data;
 
       if (response.statusCode == 200) {
-        final result = data as Map<String, String>;
+        final result = data as Map<String, dynamic>;
         return Right(result);
       } else {
         return Left(AppFailure(
@@ -113,6 +113,12 @@ class AuthRemoteRepository {
       print("❌ Login Error: ${e.toString()}");
 
       return Left(AppFailure("Unexpected error: ${e.toString()}"));
+    } catch (e) {
+      print(e.toString());
+
+      return Left(
+        AppFailure("Something went wrong. Please try again after sometime"),
+      );
     }
   }
 
@@ -177,9 +183,10 @@ class AuthRemoteRepository {
       print(
           "🟣 Fetch Driver Profile Response: ${response.statusCode} -> ${response.data}");
 
-      final data = jsonDecode(response.data) as Map<String, dynamic>;
+      final data = response.data as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
+        print(data);
         return Right(DriverModel.fromMap(data));
       } else {
         return Left(
@@ -190,15 +197,19 @@ class AuthRemoteRepository {
       }
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionTimeout) {
+        print("Internet issue");
         return Left(
           AppFailure(
               "Request timed out. Please check your internet connection."),
         );
       }
-      ;
 
       print("❌ Fetch Driver Profile Error: $e");
       return Left(AppFailure("Unexpected error: $e"));
+    } catch (e) {
+      print(e);
+      return Left(AppFailure(
+          "An error occurred connecting to servers. Check your internet connection and try again."));
     }
   }
 

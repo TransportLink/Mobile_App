@@ -53,21 +53,10 @@ class AuthViewmodel extends _$AuthViewmodel {
     final val = switch (res) {
       Left(value: final l) => state =
           AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final _) => state = AsyncValue.data(
-          DriverModel(
-              id: 'id',
-              full_name: 'full_name',
-              email: 'email',
-              password: 'password',
-              phone_number: 'phone_number',
-              date_of_birth: 'date_of_birth',
-              license_number: 'license_number',
-              license_expiry: 'license_expiry',
-              national_id: 'national_id'),
-        )
+      Right(value: final _) => state
     };
 
-    print(val.value);
+    print(val);
   }
 
   Future<void> loginUser(
@@ -86,11 +75,11 @@ class AuthViewmodel extends _$AuthViewmodel {
   }
 
   Future<AsyncValue<DriverModel>> _loginDriverSuccess(
-      Map<String, String> token) async {
+      Map<String, dynamic> token) async {
     _authLocalRepository.setToken("access_token", token["access_token"]);
     _authLocalRepository.setToken("refresh_token", token["refresh_token"]);
     DriverModel? driverModel = await getDriverData();
-
+    
     return state = AsyncValue.data(driverModel!);
   }
 

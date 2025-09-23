@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'auth_viewmodel.dart';
+part of 'map_view_model.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,28 +9,28 @@ part of 'auth_viewmodel.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(AuthViewmodel)
-const authViewmodelProvider = AuthViewmodelProvider._();
+@ProviderFor(MapViewModel)
+const mapViewModelProvider = MapViewModelProvider._();
 
-final class AuthViewmodelProvider
-    extends $NotifierProvider<AuthViewmodel, AsyncValue<DriverModel>?> {
-  const AuthViewmodelProvider._()
+final class MapViewModelProvider
+    extends $NotifierProvider<MapViewModel, AsyncValue<DriverModel>?> {
+  const MapViewModelProvider._()
       : super(
           from: null,
           argument: null,
           retry: null,
-          name: r'authViewmodelProvider',
+          name: r'mapViewModelProvider',
           isAutoDispose: true,
           dependencies: null,
           $allTransitiveDependencies: null,
         );
 
   @override
-  String debugGetCreateSourceHash() => _$authViewmodelHash();
+  String debugGetCreateSourceHash() => _$mapViewModelHash();
 
   @$internal
   @override
-  AuthViewmodel create() => AuthViewmodel();
+  MapViewModel create() => MapViewModel();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(AsyncValue<DriverModel>? value) {
@@ -41,9 +41,9 @@ final class AuthViewmodelProvider
   }
 }
 
-String _$authViewmodelHash() => r'fb20701d78b54552860ebe3bfefaa1a6d88cf3e4';
+String _$mapViewModelHash() => r'e661ec65143632ff7459d25c82fb0dfa60408ac8';
 
-abstract class _$AuthViewmodel extends $Notifier<AsyncValue<DriverModel>?> {
+abstract class _$MapViewModel extends $Notifier<AsyncValue<DriverModel>?> {
   AsyncValue<DriverModel>? build();
   @$mustCallSuper
   @override
