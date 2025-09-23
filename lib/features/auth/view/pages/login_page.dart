@@ -87,23 +87,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
       bottomNavigationBar: Container(
-        height: 72,
-        color: Colors.white,
-        child: isLoading
-            ? InactiveButton("Login")
-            : AppButton(
-                text: "Login",
-                onTap: () async {
-                  if (!formKey.currentState!.validate()) {
-                    showSnackBar(context, "Invalid data in some fields!");
-                  } else {
-                    ref.read(authViewmodelProvider.notifier).loginUser(
-                        email: emailController.text,
-                        password: passwordController.text);
-                  }
-                },
-              ),
-      ),
+          height: 72,
+          color: Colors.white,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 20),
+            child: isLoading
+                ? InactiveButton("Login")
+                : AppButton(
+                    text: "Login",
+                    onTap: () async {
+                      if (!formKey.currentState!.validate()) {
+                        showSnackBar(context, "Invalid data in some fields!");
+                      } else {
+                        ref.read(authViewmodelProvider.notifier).loginUser(
+                            email: emailController.text,
+                            password: passwordController.text);
+                      }
+                    },
+                  ),
+          )),
     );
   }
 }

@@ -36,4 +36,30 @@ class Destination {
       availabilityStatus: json['availability_status'] ?? 'not_available',
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'destinationId': destinationId,
+      'driverId': driverId,
+      'routeName': routeName,
+      'startLatitude': startLatitude,
+      'startLongitude': startLongitude,
+      'endLatitude': endLatitude,
+      'endLongitude': endLongitude,
+      'availabilityStatus': availabilityStatus,
+    };
+  }
+
+  factory Destination.fromMap(Map<String, dynamic> map) {
+    return Destination(
+      destinationId: map['destinationId'] ?? '',
+      driverId: map['driverId'] ?? '',
+      routeName: map['routeName'] ?? '',
+      startLatitude: map['startLatitude'] ?? 0,
+      startLongitude: map['startLongitude'] ?? 0,
+      endLatitude: map['endLatitude'] ?? 0,
+      endLongitude: map['endLongitude'] ?? 0,
+      availabilityStatus: map['availabilityStatus'] ?? '',
+    );
+  }
 }

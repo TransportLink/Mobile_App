@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class VehiclePage extends StatefulWidget {
-  const VehiclePage({ Key? key }) : super(key: key);
+  const VehiclePage({ super.key });
 
   @override
   _VehiclePageState createState() => _VehiclePageState();

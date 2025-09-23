@@ -41,7 +41,7 @@ final class AuthViewmodelProvider
   }
 }
 
-String _$authViewmodelHash() => r'fb20701d78b54552860ebe3bfefaa1a6d88cf3e4';
+String _$authViewmodelHash() => r'e423ab0cd4fc28fbbdc33e4ee7f905b9136ccd59';
 
 abstract class _$AuthViewmodel extends $Notifier<AsyncValue<DriverModel>?> {
   AsyncValue<DriverModel>? build();

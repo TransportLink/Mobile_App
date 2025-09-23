@@ -79,7 +79,7 @@ class AuthViewmodel extends _$AuthViewmodel {
     _authLocalRepository.setToken("access_token", token["access_token"]);
     _authLocalRepository.setToken("refresh_token", token["refresh_token"]);
     DriverModel? driverModel = await getDriverData();
-    
+
     return state = AsyncValue.data(driverModel!);
   }
 
@@ -100,6 +100,35 @@ class AuthViewmodel extends _$AuthViewmodel {
 
     print(val.value);
     return val.value;
+  }
+
+  Future<DriverModel?> updateDriverData(String? profilePhotoPath) async {
+    state = const AsyncValue.loading();
+    final token = _authLocalRepository.getToken('access_token');
+
+    if (token == null) {
+      return null;
+    }
+
+    final currentDriver = ref.read(currentDriverProvider);
+
+    final res = await _authRemoteRepository.updateDriverProfile(
+        data: currentDriver!.toMap(),
+        accessToken: token,
+        photoPath: profilePhotoPath);
+    final val = switch (res) {
+      Left(value: final l) => state =
+          AsyncValue.error(l.message, StackTrace.current),
+      Right(value: final _) => await _updateDriverDataSuccess()
+    };
+
+    print(val.value);
+    return val.value;
+  }
+
+  Future<AsyncValue<DriverModel>> _updateDriverDataSuccess() async {
+    final currentDriver = await getDriverData();
+    return state = AsyncValue.data(currentDriver!);
   }
 
   AsyncValue<DriverModel> _fetchDriverDataSuccess(DriverModel driver) {

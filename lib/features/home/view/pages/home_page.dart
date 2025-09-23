@@ -8,7 +8,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 2;
+  final int _selectedIndex = 2;
 
   @override
   Widget build(BuildContext context) {

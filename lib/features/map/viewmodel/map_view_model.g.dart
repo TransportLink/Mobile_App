@@ -41,7 +41,7 @@ final class MapViewModelProvider
   }
 }
 
-String _$mapViewModelHash() => r'e661ec65143632ff7459d25c82fb0dfa60408ac8';
+String _$mapViewModelHash() => r'2b8e85586355c968df78c95399ff9383f600335b';
 
 abstract class _$MapViewModel extends $Notifier<AsyncValue<DriverModel>?> {
   AsyncValue<DriverModel>? build();
