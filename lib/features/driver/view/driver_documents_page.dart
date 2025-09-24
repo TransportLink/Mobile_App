@@ -51,11 +51,13 @@ class _DriverDocumentsPageState extends ConsumerState<DriverDocumentsPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
-      body: Stack(
-        children: [
-          _buildMainContent(),
-          if (_isUploadModalOpen) _buildUploadModal(),
-        ],
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _buildMainContent(),
+            if (_isUploadModalOpen) _buildUploadModal(),
+          ],
+        ),
       ),
       floatingActionButton: _buildFloatingActionButton(),
     );

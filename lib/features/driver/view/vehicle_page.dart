@@ -72,13 +72,13 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
   Future<void> _deleteVehicle(VehicleModel vehicle) async {
     try {
       await ref.read(vehicleViewModelProvider.notifier).deleteVehicle(
-        vehicle.vehicleId!,
-      );
-      
+            vehicle.vehicleId!,
+          );
+
       if (mounted) {
         // Refresh vehicles list
         ref.invalidate(getAllVehiclesProvider);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Vehicle deleted successfully'),
@@ -113,80 +113,83 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
   }
 
   Widget _buildVehicleDetailsModal(VehicleModel vehicle) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                vehicle.displayName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildDetailRow('Plate Number', vehicle.plateNumber),
-          _buildDetailRow('Brand', vehicle.brand),
-          _buildDetailRow('Model', vehicle.model),
-          _buildDetailRow('Year', vehicle.year),
-          _buildDetailRow('Color', vehicle.color),
-          if (vehicle.vehicleType != null)
-            _buildDetailRow('Type', vehicle.vehicleType!),
-          if (vehicle.seatingCapacity != null)
-            _buildDetailRow('Seating Capacity', '${vehicle.seatingCapacity} seats'),
-          if (vehicle.insuranceNumber != null)
-            _buildDetailRow('Insurance Number', vehicle.insuranceNumber!),
-          if (vehicle.insuranceExpiryDate != null)
-            _buildDetailRow('Insurance Expiry', vehicle.insuranceExpiryDate!),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _openEditModal(vehicle);
-                  },
-                  icon: const Icon(Icons.edit, size: 18),
-                  label: const Text('Edit'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black12),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+    return SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  vehicle.displayName,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showDeleteConfirmation(vehicle);
-                  },
-                  icon: const Icon(Icons.delete, size: 18),
-                  label: const Text('Delete'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildDetailRow('Plate Number', vehicle.plateNumber),
+            _buildDetailRow('Brand', vehicle.brand),
+            _buildDetailRow('Model', vehicle.model),
+            _buildDetailRow('Year', vehicle.year),
+            _buildDetailRow('Color', vehicle.color),
+            if (vehicle.vehicleType != null)
+              _buildDetailRow('Type', vehicle.vehicleType!),
+            if (vehicle.seatingCapacity != null)
+              _buildDetailRow(
+                  'Seating Capacity', '${vehicle.seatingCapacity} seats'),
+            if (vehicle.insuranceNumber != null)
+              _buildDetailRow('Insurance Number', vehicle.insuranceNumber!),
+            if (vehicle.insuranceExpiryDate != null)
+              _buildDetailRow('Insurance Expiry', vehicle.insuranceExpiryDate!),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _openEditModal(vehicle);
+                    },
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      side: const BorderSide(color: Colors.black12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showDeleteConfirmation(vehicle);
+                    },
+                    icon: const Icon(Icons.delete, size: 18),
+                    label: const Text('Delete'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -228,11 +231,13 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
-      body: Stack(
-        children: [
-          _buildMainContent(),
-          if (_isAddModalOpen) _buildModal(),
-        ],
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _buildMainContent(),
+            if (_isAddModalOpen) _buildModal(),
+          ],
+        ),
       ),
       floatingActionButton: _buildFloatingActionButton(),
     );
@@ -329,7 +334,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
     return Consumer(
       builder: (context, ref, child) {
         final vehiclesAsync = ref.watch(getAllVehiclesProvider);
-        
+
         return vehiclesAsync.when(
           data: (vehicles) {
             if (vehicles.isEmpty) {

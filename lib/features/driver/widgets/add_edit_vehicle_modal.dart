@@ -147,7 +147,6 @@ class _AddEditVehicleModalState extends ConsumerState<AddEditVehicleModal> {
       _formErrors = {};
     });
 
-    // Prepare data to match backend API
     final data = <String, dynamic>{
       'brand': _brandController.text.trim(),
       'model': _modelController.text.trim(),
@@ -156,7 +155,6 @@ class _AddEditVehicleModalState extends ConsumerState<AddEditVehicleModal> {
       'color': _colorController.text.trim(),
     };
 
-    // Add optional fields only if they have values
     if (_vehicleTypeController.text.trim().isNotEmpty) {
       data['vehicle_type'] = _vehicleTypeController.text.trim();
     }

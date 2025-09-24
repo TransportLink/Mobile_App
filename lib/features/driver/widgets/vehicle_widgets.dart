@@ -32,16 +32,21 @@ class VehicleWidgets {
           children: [
             Row(
               children: [
-                Container(
+                Padding(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    VehicleUtils.getVehicleIcon(vehicle.vehicleType),
-                    color: Colors.black54,
-                    size: 24,
+                  child: Container(
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: vehicle.photoUrl == null
+                        ? Icon(VehicleUtils.getVehicleIcon(vehicle.vehicleType),
+                            color: Colors.black54)
+                        : Image.network(
+                            vehicle.photoUrl!,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -69,7 +74,6 @@ class VehicleWidgets {
                     ],
                   ),
                 ),
-                
                 if (vehicle.status != null) _buildStatusChip(vehicle.status!),
               ],
             ),
@@ -109,7 +113,8 @@ class VehicleWidgets {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                       ),
                     ),
-                  if (onEdit != null && onDelete != null) const SizedBox(width: 8),
+                  if (onEdit != null && onDelete != null)
+                    const SizedBox(width: 8),
                   if (onDelete != null)
                     TextButton.icon(
                       onPressed: onDelete,
@@ -129,7 +134,7 @@ class VehicleWidgets {
     );
   }
 
-    /// Build status chip
+  /// Build status chip
   static Widget _buildStatusChip(String status) {
     final statusText = VehicleUtils.getStatusText(status);
 
@@ -151,13 +156,12 @@ class VehicleWidgets {
     );
   }
 
-
   /// Build detail chip
   static Widget _buildDetailChip(
     IconData icon,
     String label, {
     Color? color,
-  }) {    
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

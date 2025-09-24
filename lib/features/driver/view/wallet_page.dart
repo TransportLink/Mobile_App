@@ -73,14 +73,16 @@ class _WalletPageState extends State<WalletPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildBalanceCard(),
-            _buildQuickActions(),
-            _buildEarningsOverview(),
-            _buildTransactionHistory(),
-          ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildBalanceCard(),
+              _buildQuickActions(),
+              _buildEarningsOverview(),
+              _buildTransactionHistory(),
+            ],
+          ),
         ),
       ),
     );
