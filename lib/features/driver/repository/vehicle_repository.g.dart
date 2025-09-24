@@ -50,4 +50,4 @@ final class VehicleRepositoryProvider extends $FunctionalProvider<
   }
 }
 
-String _$vehicleRepositoryHash() => r'e08eff52fca61d3d9e30d35c5ec98f93fbaa5b0e';
+String _$vehicleRepositoryHash() => r'012e5d942c780767dad71e92022b5797f4cdcf68';

@@ -1,3 +1,4 @@
+import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:mobileapp/core/model/driver_document.dart';
@@ -37,12 +38,11 @@ class DriverViewModel extends _$DriverViewModel {
   }
 
   /// Upload a document for the current driver
-  Future<void> uploadDocument({
-    required String documentType,
-    required String documentNumber,
-    required String expiryDate,
-    String? documentPath,
-  }) async {
+  Future<void> uploadDocument(
+      {required String documentType,
+      required String documentNumber,
+      required String expiryDate,
+      File? documentFile}) async {
     state = const AsyncValue.loading();
 
     final accessToken = _authLocalRepository.getToken('access_token');
@@ -51,11 +51,22 @@ class DriverViewModel extends _$DriverViewModel {
       return;
     }
 
+    String? documentFilePath;
+
+    if (documentFile != null) {
+      final res = await _driverRepository.uploadFile(documentFile);
+      final _ = switch (res) {
+        Left(value: final l) => state =
+            AsyncValue.error(l.message, StackTrace.current),
+        Right(value: final r) => documentFilePath = r
+      };
+    }
+
     final res = await _driverRepository.uploadDocument(
       documentType: documentType,
       documentNumber: documentNumber,
       expiryDate: expiryDate,
-      documentPath: documentPath, // local path sent directly
+      documentPath: documentFilePath,
       accessToken: accessToken,
     );
 

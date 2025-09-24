@@ -92,7 +92,7 @@ class _UploadDocumentModalState extends ConsumerState<UploadDocumentModal> {
             documentType: _documentTypeController.text,
             documentNumber: _documentNumberController.text,
             expiryDate: _expiryDateController.text,
-            documentPath: _selectedDocument?.path,
+            documentFile: _selectedDocument?.absolute,
           );
 
       if (mounted) {

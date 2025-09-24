@@ -45,13 +45,13 @@ final class GetAllVehiclesProvider extends $FunctionalProvider<
   }
 }
 
-String _$getAllVehiclesHash() => r'91802851cc0b24b1058d308555643c15c7594a67';
+String _$getAllVehiclesHash() => r'24d44ee39ac9ad4e196538fce9ae8b062ae0eb05';
 
 @ProviderFor(VehicleViewModel)
 const vehicleViewModelProvider = VehicleViewModelProvider._();
 
 final class VehicleViewModelProvider
-    extends $NotifierProvider<VehicleViewModel, AsyncValue<dynamic>?> {
+    extends $NotifierProvider<VehicleViewModel, AsyncValue<VehicleModel?>?> {
   const VehicleViewModelProvider._()
       : super(
           from: null,
@@ -71,26 +71,28 @@ final class VehicleViewModelProvider
   VehicleViewModel create() => VehicleViewModel();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AsyncValue<dynamic>? value) {
+  Override overrideWithValue(AsyncValue<VehicleModel?>? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<AsyncValue<dynamic>?>(value),
+      providerOverride: $SyncValueProvider<AsyncValue<VehicleModel?>?>(value),
     );
   }
 }
 
-String _$vehicleViewModelHash() => r'6fbff724c2d72dae0655b29fb0e3787a45b5144d';
+String _$vehicleViewModelHash() => r'c1f22339653490efe51aee05e6ac5da64f2fe3f0';
 
-abstract class _$VehicleViewModel extends $Notifier<AsyncValue<dynamic>?> {
-  AsyncValue<dynamic>? build();
+abstract class _$VehicleViewModel
+    extends $Notifier<AsyncValue<VehicleModel?>?> {
+  AsyncValue<VehicleModel?>? build();
   @$mustCallSuper
   @override
   void runBuild() {
     final created = build();
-    final ref = this.ref as $Ref<AsyncValue<dynamic>?, AsyncValue<dynamic>?>;
+    final ref = this.ref
+        as $Ref<AsyncValue<VehicleModel?>?, AsyncValue<VehicleModel?>?>;
     final element = ref.element as $ClassProviderElement<
-        AnyNotifier<AsyncValue<dynamic>?, AsyncValue<dynamic>?>,
-        AsyncValue<dynamic>?,
+        AnyNotifier<AsyncValue<VehicleModel?>?, AsyncValue<VehicleModel?>?>,
+        AsyncValue<VehicleModel?>?,
         Object?,
         Object?>;
     element.handleValue(ref, created);

@@ -32,7 +32,7 @@ class VehicleViewModel extends _$VehicleViewModel {
   late AuthLocalRepository _authLocalRepository;
 
   @override
-  AsyncValue<VehicleModel>? build() {
+  AsyncValue<VehicleModel?>? build() {
     _vehicleRepository = ref.watch(vehicleRepositoryProvider);
     _authLocalRepository = ref.watch(authLocalRepositoryProvider);
     return null;
