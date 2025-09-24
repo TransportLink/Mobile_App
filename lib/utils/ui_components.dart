@@ -11,6 +11,8 @@ class UIComponents {
     VoidCallback onAccept,
   ) {
     print("ℹ️ Building bus stop card for ${stop.systemId}");
+    final totalPassengers = stop.destinations.values.fold<int>(
+        0, (sum, count) => sum + (count as int? ?? 0));
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -39,9 +41,8 @@ class UIComponents {
               const Icon(Icons.people, color: Colors.blue, size: 24),
               const SizedBox(width: 8),
               Text(
-                'Total Passengers: ${stop.totalCount ?? 0}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                'Total Passengers: $totalPassengers',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -114,28 +115,25 @@ class UIComponents {
   }
 
   static Widget buildTripCard(
-    Destination destination,
+    List<Destination> destinations,
     route_models.Route? route,
     String? currentBusStopId,
     List<BusStop> busStops,
     VoidCallback onArrived,
     VoidCallback onCancel,
   ) {
-    final passengerCount = currentBusStopId != null
-        ? busStops
-                .firstWhereOrNull((stop) => stop.systemId == currentBusStopId)
-                ?.totalCount ??
-            0
-        : 0;
+    final busStop = busStops.firstWhereOrNull((stop) => stop.systemId == currentBusStopId);
+    final passengerCount = destinations.fold<int>(
+        0, (sum, dest) => sum + (dest.passengerCount));
     print(
-        "ℹ️ Building trip card: route=${destination.routeName}, passengers=$passengerCount");
+        "ℹ️ Building trip card: busStop=${busStop?.systemId}, destinations=${destinations.length}, passengers=$passengerCount");
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Trip to ${destination.routeName}',
+            'Trip to ${busStop?.systemId ?? route?.destination ?? 'Bus Stop'}',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -176,6 +174,47 @@ class UIComponents {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Text(
+              'Destinations:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                children: destinations.map((dest) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${dest.passengerCount}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            dest.destination ?? 'Lat: ${dest.destLat}, Lng: ${dest.destLng}',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ],
           const Spacer(),
           Row(
@@ -205,27 +244,23 @@ class UIComponents {
   }
 
   static Widget buildMinimizedTripCard(
-    Destination destination,
+    List<Destination> destinations,
     route_models.Route? route,
     String? currentBusStopId,
     List<BusStop> busStops,
     VoidCallback onTap,
   ) {
-    final passengerCount = currentBusStopId != null
-        ? busStops
-                .firstWhereOrNull((stop) => stop.systemId == currentBusStopId)
-                ?.totalCount ??
-            0
-        : 0;
+    final busStop = busStops.firstWhereOrNull((stop) => stop.systemId == currentBusStopId);
+    final passengerCount = destinations.fold<int>(
+        0, (sum, dest) => sum + (dest.passengerCount));
     print(
-        "ℹ️ Building minimized trip card: route=${destination.routeName}, passengers=$passengerCount");
+        "ℹ️ Building minimized trip card: busStop=${busStop?.systemId}, destinations=${destinations.length}, passengers=$passengerCount");
 
     return GestureDetector(
       onTap: onTap,
       child: Card(
         elevation: 8.0,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
         margin: const EdgeInsets.all(8.0),
         child: Container(
           decoration: BoxDecoration(
@@ -247,13 +282,12 @@ class UIComponents {
                     message: 'Current Trip',
                     child: Row(
                       children: [
-                        Icon(Icons.route,
-                            color: Colors.blue.shade700, size: 20),
+                        Icon(Icons.route, color: Colors.blue.shade700, size: 20),
                         const SizedBox(width: 4),
                         Container(
                           constraints: const BoxConstraints(maxWidth: 100),
                           child: Text(
-                            destination.routeName,
+                            busStop?.systemId ?? route?.destination ?? 'Bus Stop',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -274,13 +308,11 @@ class UIComponents {
                       message: 'Estimated Time',
                       child: Row(
                         children: [
-                          Icon(Icons.timer,
-                              color: Colors.green.shade700, size: 20),
+                          Icon(Icons.timer, color: Colors.green.shade700, size: 20),
                           const SizedBox(width: 4),
                           Text(
                             '${(route.eta / 60).toStringAsFixed(1)} min',
-                            style: const TextStyle(
-                                fontSize: 14, color: Colors.black87),
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
                           ),
                         ],
                       ),
@@ -293,13 +325,11 @@ class UIComponents {
                       message: 'Distance',
                       child: Row(
                         children: [
-                          Icon(Icons.straighten,
-                              color: Colors.blue.shade700, size: 20),
+                          Icon(Icons.straighten, color: Colors.blue.shade700, size: 20),
                           const SizedBox(width: 4),
                           Text(
                             '${(route.distance / 1000).toStringAsFixed(1)} km',
-                            style: const TextStyle(
-                                fontSize: 14, color: Colors.black87),
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
                           ),
                         ],
                       ),
@@ -311,13 +341,11 @@ class UIComponents {
                     message: 'Passengers',
                     child: Row(
                       children: [
-                        Icon(Icons.people,
-                            color: Colors.green.shade700, size: 20),
+                        Icon(Icons.people, color: Colors.green.shade700, size: 20),
                         const SizedBox(width: 4),
                         Text(
                           '$passengerCount',
-                          style: const TextStyle(
-                              fontSize: 14, color: Colors.black87),
+                          style: const TextStyle(fontSize: 14, color: Colors.black87),
                         ),
                       ],
                     ),

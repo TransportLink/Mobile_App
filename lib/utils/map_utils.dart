@@ -29,22 +29,25 @@ class MapUtils {
 
     for (var stop in busStops) {
       try {
-        print("🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude}) with ${stop.totalCount} passengers");
+        print(
+            "🚌 Adding marker for ${stop.systemId} at (${stop.latitude}, ${stop.longitude}) with ${stop.totalCount} passengers");
         await manager.create(mapbox.PointAnnotationOptions(
-          geometry: mapbox.Point(coordinates: mapbox.Position(stop.longitude, stop.latitude)),
+          geometry: mapbox.Point(
+              coordinates: mapbox.Position(stop.longitude, stop.latitude)),
           image: imageData,
-          iconSize: 0.5,
+          iconSize: 0.8,
           textField: stop.totalCount?.toString() ?? '0',
           textOffset: [0.0, -2.0],
           textColor: Colors.blue.value,
           textHaloColor: Colors.white.value,
           textHaloWidth: 2.0,
-          textSize: 16.0,
+          textSize: 20.0,
         ));
       } catch (e) {
         print("❌ Failed to add marker for ${stop.systemId}: $e");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add marker for ${stop.systemId}: $e')),
+          SnackBar(
+              content: Text('Failed to add marker for ${stop.systemId}: $e')),
         );
       }
     }
@@ -61,9 +64,11 @@ class MapUtils {
       final position = await geo.Geolocator.getCurrentPosition(
         desiredAccuracy: geo.LocationAccuracy.high,
       );
-      final center = mapbox.Point(coordinates: mapbox.Position(position.longitude, position.latitude));
+      final center = mapbox.Point(
+          coordinates: mapbox.Position(position.longitude, position.latitude));
       await pointAnnotationManager?.deleteAll();
-      final manager = await mapboxMap?.annotations.createPointAnnotationManager();
+      final manager =
+          await mapboxMap?.annotations.createPointAnnotationManager();
       if (manager == null) {
         print("❌ Failed to create PointAnnotationManager for user location");
         ScaffoldMessenger.of(context).showSnackBar(
@@ -71,15 +76,17 @@ class MapUtils {
         );
         return;
       }
-      final ByteData bytes = await rootBundle.load('assets/images/driver_location.png');
+      final ByteData bytes =
+          await rootBundle.load('assets/images/driver_loc.png');
       final Uint8List imageData = bytes.buffer.asUint8List();
       await manager.create(mapbox.PointAnnotationOptions(
         geometry: center,
         image: imageData,
-        iconSize: 0.6,
+        iconSize: 0.5,
       ));
       pointAnnotationManager = manager;
-      print("📍 User location marker added: ${position.latitude}, ${position.longitude}");
+      print(
+          "📍 User location marker added: ${position.latitude}, ${position.longitude}");
       await fitMapToBounds(mapboxMap, position, []);
     } catch (e) {
       print("❌ Error showing user location: $e");
@@ -102,12 +109,15 @@ class MapUtils {
     if (busStops.isEmpty) {
       await mapboxMap.flyTo(
         mapbox.CameraOptions(
-          center: mapbox.Point(coordinates: mapbox.Position(position.longitude, position.latitude)),
+          center: mapbox.Point(
+              coordinates:
+                  mapbox.Position(position.longitude, position.latitude)),
           zoom: 14.0,
         ),
         mapbox.MapAnimationOptions(duration: 1000),
       );
-      print("✅ Map centered on driver location: (${position.longitude}, ${position.latitude})");
+      print(
+          "✅ Map centered on driver location: (${position.longitude}, ${position.latitude})");
       return;
     }
 
@@ -170,12 +180,14 @@ class MapUtils {
 
     await mapboxMap.flyTo(
       mapbox.CameraOptions(
-        center: mapbox.Point(coordinates: mapbox.Position(centerLon, centerLat)),
+        center:
+            mapbox.Point(coordinates: mapbox.Position(centerLon, centerLat)),
         zoom: zoomLevel,
       ),
       mapbox.MapAnimationOptions(duration: 1000),
     );
-    print("✅ Map fitted to bounds: center=($centerLon, $centerLat), zoom=$zoomLevel, bounds=[($minLon, $minLat), ($maxLon, $maxLat)]");
+    print(
+        "✅ Map fitted to bounds: center=($centerLon, $centerLat), zoom=$zoomLevel, bounds=[($minLon, $minLat), ($maxLon, $maxLat)]");
   }
 
   Future<void> showRoute(

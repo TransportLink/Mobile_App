@@ -27,13 +27,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     with SingleTickerProviderStateMixin {
   mapbox.MapboxMap? mapboxMap;
   mapbox.PointAnnotationManager? pointAnnotationManager;
-  final MapService _mapService = MapService();
+  final MapService _mapService =
+      MapService(); // Requires Dio and AuthService injection
   final AuthService _authService = AuthService();
   final DriverLocationService _driverLocationService = DriverLocationService();
   final MapUtils _mapUtils = MapUtils();
   List<BusStop> _busStops = [];
   route_models.Route? _currentRoute;
-  Destination? _currentDestination;
+  List<Destination> _selectedDestinations = [];
   bool _isLoading = true;
   int _selectedIndex = 0;
   String? _driverId;
@@ -47,6 +48,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   BusStop? _selectedBusStop;
   String? _currentBusStopId;
   bool _isTripCardMinimized = false;
+  List<Map<String, dynamic>> _vehicles = [];
+  String? _selectedVehicleId;
+  int? _tripId;
 
   @override
   void initState() {
@@ -62,7 +66,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       parent: _animationController!,
       curve: Curves.easeInOut,
     ));
-    _initializeDriverId();
+    _initializeDriverAndTrip();
+    _fetchVehicles();
     _requestLocationPermission();
     _startLocationUpdates();
   }
@@ -76,7 +81,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     super.dispose();
   }
 
-  Future<void> _initializeDriverId() async {
+  Future<void> _initializeDriverAndTrip() async {
     final prefs = await SharedPreferences.getInstance();
     final profileResult = await _authService.fetchDriverProfile();
     if (profileResult['success']) {
@@ -90,6 +95,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         SnackBar(
             content: Text(
                 profileResult['message'] ?? 'Error fetching driver profile')),
+      );
+    }
+    // Load trip_id from SharedPreferences
+    final tripId = prefs.getInt('trip_id');
+    if (tripId != null) {
+      setState(() {
+        _tripId = tripId;
+        print("✅ Loaded trip ID: $_tripId");
+      });
+    }
+  }
+
+  Future<void> _fetchVehicles() async {
+    final vehicleResult = await _authService.listVehicles();
+    if (vehicleResult['success']) {
+      setState(() {
+        _vehicles = List<Map<String, dynamic>>.from(vehicleResult['data']);
+        _selectedVehicleId =
+            _vehicles.isNotEmpty ? _vehicles.first['vehicle_id'] : null;
+      });
+      print("✅ Fetched ${_vehicles.length} vehicles");
+    } else {
+      print("❌ Error fetching vehicles: ${vehicleResult['message']}");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text(vehicleResult['message'] ?? 'Error fetching vehicles')),
       );
     }
   }
@@ -134,6 +166,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   }
 
   Future<void> _startLocationUpdates() async {
+    _locationUpdateTimer?.cancel(); // Cancel any existing timer
     _locationUpdateTimer =
         Timer.periodic(const Duration(seconds: 10), (timer) async {
       try {
@@ -180,7 +213,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       return;
     }
     if (mapboxMap == null) {
-      print("❌ Mapbox map not initialized, delaying bus stop polling");
+      print("⚠️ Mapbox map not initialized, delaying bus stop polling");
       await Future.doWhile(() async {
         await Future.delayed(const Duration(milliseconds: 500));
         return mapboxMap == null;
@@ -189,10 +222,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     }
     _busStopUpdateTimer =
         Timer.periodic(const Duration(seconds: 30), (timer) async {
-      if (_currentDestination != null) {
+      if (_selectedDestinations.isNotEmpty) {
         print("ℹ️ Updating bus stop during active trip");
         try {
-          print("📡 Starting periodic bus stop update");
           final position = await geo.Geolocator.getCurrentPosition(
             desiredAccuracy: geo.LocationAccuracy.high,
           );
@@ -238,46 +270,94 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       return;
     }
     _routeUpdateTimer =
-        Timer.periodic(const Duration(seconds: 15), (timer) async {
-      if (_currentDestination == null || _driverId == null) return;
+        Timer.periodic(const Duration(minutes: 5), (timer) async {
+      if (_selectedDestinations.isEmpty ||
+          _driverId == null ||
+          _currentBusStopId == null ||
+          _selectedVehicleId == null ||
+          _tripId == null) {
+        print("⚠️ No active trip, stopping route updates");
+        _routeUpdateTimer?.cancel();
+        _routeUpdateTimer = null;
+        return;
+      }
       try {
         final position = await geo.Geolocator.getCurrentPosition(
           desiredAccuracy: geo.LocationAccuracy.high,
         );
-        final routeResult = await _mapService.fetchRoute(
-          driverId: _driverId!,
-          destination: _currentDestination!.routeName.split(' to ').last,
-          systemId: _currentDestination!.routeName.split(' to ').first,
-          destLat: _currentDestination!.endLatitude,
-          destLng: _currentDestination!.endLongitude,
-          startLat: position.latitude,
-          startLng: position.longitude,
+        final stop =
+            _busStops.firstWhereOrNull((s) => s.systemId == _currentBusStopId);
+        if (stop == null) {
+          print("❌ Bus stop not found for systemId: $_currentBusStopId");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bus stop not found')),
+          );
+          return;
+        }
+        // Calculate ETA to the bus stop
+        final eta = await _mapService.calculateEta(
+          driverLat: position.latitude,
+          driverLng: position.longitude,
+          busStopLat: stop.latitude,
+          busStopLng: stop.longitude,
         );
-        if (routeResult['success']) {
-          setState(() {
-            _currentRoute = route_models.Route.fromJson(routeResult['data']);
-          });
-          await _mapUtils.showRoute(mapboxMap, _currentRoute!, context);
-          await mapboxMap?.flyTo(
-            mapbox.CameraOptions(
-              center: mapbox.Point(
-                coordinates:
-                    mapbox.Position(position.longitude, position.latitude),
+        if (eta == null) {
+          print("❌ Failed to calculate ETA");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to calculate ETA')),
+          );
+          return;
+        }
+        final updateResult = await _mapService.updateLocation(
+          driverId: _driverId!,
+          systemId: _currentBusStopId!,
+          vehicleId: _selectedVehicleId!,
+          tripId: _tripId!,
+          busStopLat: stop.latitude,
+          busStopLng: stop.longitude,
+          eta: eta,
+        );
+        if (updateResult['success']) {
+          print("✅ Location updated successfully with ETA: $eta");
+          // Optionally update the route if the server returns new route data
+          if (updateResult['data'] != null &&
+              updateResult['data']['route'] != null) {
+            setState(() {
+              _currentRoute =
+                  route_models.Route.fromJson(updateResult['data']['route']);
+            });
+            await _mapUtils.showRoute(mapboxMap, _currentRoute!, context);
+            await mapboxMap?.flyTo(
+              CameraOptions(
+                center: mapbox.Point(
+                  coordinates:
+                      mapbox.Position(position.longitude, position.latitude),
+                ),
+                zoom: 14.0,
               ),
-              zoom: 14.0,
-            ),
-            mapbox.MapAnimationOptions(duration: 1000),
+              MapAnimationOptions(duration: 1000),
+            );
+          }
+        } else {
+          print("❌ Failed to update location: ${updateResult['message']}");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    updateResult['message'] ?? 'Failed to update location')),
           );
         }
       } catch (e) {
         print("❌ Error updating route: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update route')),
+        );
       }
     });
   }
 
   Future<void> _fetchBusStops() async {
     if (mapboxMap == null) {
-      print("❌ Mapbox map not initialized, skipping bus stop fetch");
+      print("⚠️ Mapbox map not initialized, skipping bus stop fetch");
       return;
     }
     const maxRetries = 3;
@@ -343,19 +423,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     );
   }
 
-  Future<void> _acceptTrip(BusStop stop) async {
-    if (_driverId == null) {
-      print("❌ Driver ID not found");
+  Future<void> _selectDestinationsAndAcceptTrip(BusStop stop) async {
+    if (_driverId == null || _selectedVehicleId == null) {
+      print("❌ Driver ID or Vehicle ID not found");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Driver ID not found')),
+        const SnackBar(content: Text('Driver ID or Vehicle ID not found')),
       );
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final accessToken = prefs.getString('access_token');
-    if (accessToken == null) {
-      print("❌ Access token missing, redirecting to signin");
-      Navigator.pushReplacementNamed(context, '/signin');
+    final destinations = await showDialog<List<Destination>>(
+      context: context,
+      builder: (context) => DestinationSelectionDialog(
+        availableDestinations: stop.destinations.keys.toList(),
+        onDestinationsSelected: (selected) => Navigator.pop(context, selected),
+      ),
+    );
+    if (destinations == null || destinations.isEmpty) {
+      print("❌ No destinations selected");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No destinations selected')),
+      );
       return;
     }
     final position = await geo.Geolocator.getCurrentPosition(
@@ -363,12 +450,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     );
     final routeResult = await _mapService.fetchRoute(
       driverId: _driverId!,
-      destination: stop.destinations.keys.first,
       systemId: stop.systemId,
-      destLat: stop.latitude,
-      destLng: stop.longitude,
-      startLat: position.latitude,
-      startLng: position.longitude,
+      busStop: stop.systemId,
+      busStopLat: stop.latitude,
+      busStopLng: stop.longitude,
+      destinations: destinations
+          .map((d) => {
+                'destination': d.destination,
+                'passenger_count': d.passengerCount,
+              })
+          .toList(),
+      vehicleId: _selectedVehicleId!,
     );
     print("🟣 Full Fetch Route Response: $routeResult");
     if (!routeResult['success']) {
@@ -386,11 +478,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     }
 
     setState(() {
-      _currentRoute = route_models.Route.fromJson(routeResult['data']);
+      _currentRoute = route_models.Route.fromJson(routeResult['data']['route']);
       _currentBusStopId = stop.systemId;
       _selectedBusStop = null;
+      _selectedDestinations = destinations;
       _isTripCardMinimized = false;
+      _tripId = routeResult['data']['trip_id'];
     });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('trip_id', _tripId!);
     await _mapUtils.showRoute(mapboxMap, _currentRoute!, context);
     await mapboxMap?.flyTo(
       CameraOptions(
@@ -401,52 +497,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       ),
       MapAnimationOptions(duration: 1000),
     );
-
-    final destinationResult = await _driverLocationService.createDestination(
-      routeName: '${stop.systemId} to ${stop.destinations.keys.first}',
-      startLatitude: position.latitude,
-      startLongitude: position.longitude,
-      endLatitude: stop.latitude,
-      endLongitude: stop.longitude,
-      availabilityStatus: 'available',
-    );
-    print("🟣 Full Create Destination Response: $destinationResult");
-    if (!destinationResult['success']) {
-      print("❌ Failed to create destination: ${destinationResult['message']}");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text(destinationResult['message'] ?? 'Error accepting trip')),
-      );
-      setState(() {
-        _selectedBusStop = null;
-        _isTripCardMinimized = false;
-        _currentRoute = null;
-        _currentBusStopId = null;
-      });
-      await _animationController?.reverse();
-      return;
-    }
-
-    try {
-      setState(() {
-        _currentDestination = Destination.fromJson(destinationResult['data']);
-        print("✅ _currentDestination set: ${_currentDestination?.routeName}");
-      });
-    } catch (e) {
-      print("❌ Error parsing destination: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error parsing destination data')),
-      );
-      setState(() {
-        _selectedBusStop = null;
-        _isTripCardMinimized = false;
-        _currentRoute = null;
-        _currentBusStopId = null;
-      });
-      await _animationController?.reverse();
-      return;
-    }
 
     if (_animationController != null) {
       print("ℹ️ Resetting and forwarding animation for trip card");
@@ -463,14 +513,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   Future<void> _arrivedAtDestination() async {
     _routeUpdateTimer?.cancel();
-    if (_currentDestination == null) {
-      print("⚠️ No destination to mark as arrived, clearing route");
+    _routeUpdateTimer = null;
+    if (_selectedDestinations.isEmpty || _tripId == null) {
+      print("⚠️ No destinations to mark as arrived, clearing route");
       setState(() {
         _currentRoute = null;
-        _currentDestination = null;
+        _selectedDestinations = [];
         _currentBusStopId = null;
         _isTripCardMinimized = false;
+        _tripId = null;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('trip_id');
       await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrived at destination')),
@@ -479,16 +533,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       return;
     }
     final result = await _driverLocationService.updateDestination(
-      _currentDestination!.destinationId,
-      'not_available',
+      _selectedDestinations.first.destination ?? '',
+      'available',
     );
     if (result['success']) {
       setState(() {
         _currentRoute = null;
-        _currentDestination = null;
+        _selectedDestinations = [];
         _currentBusStopId = null;
         _isTripCardMinimized = false;
+        _tripId = null;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('trip_id');
       await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrived at destination')),
@@ -505,14 +562,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   Future<void> _cancelTrip() async {
     _routeUpdateTimer?.cancel();
-    if (_currentDestination == null) {
-      print("⚠️ No destination to cancel, clearing route");
+    _routeUpdateTimer = null;
+    if (_selectedDestinations.isEmpty ||
+        _tripId == null ||
+        _currentBusStopId == null ||
+        _selectedVehicleId == null) {
+      print(
+          "⚠️ No destinations, trip ID, or bus stop ID to cancel, clearing route");
       setState(() {
         _currentRoute = null;
-        _currentDestination = null;
+        _selectedDestinations = [];
         _currentBusStopId = null;
         _isTripCardMinimized = false;
+        _tripId = null;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('trip_id');
       await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Trip cancelled')),
@@ -520,17 +585,35 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       await _animationController?.reverse();
       return;
     }
-    final result = await _driverLocationService.updateDestination(
-      _currentDestination!.destinationId,
-      'not_available',
+    final stop =
+        _busStops.firstWhereOrNull((s) => s.systemId == _currentBusStopId);
+    if (stop == null) {
+      print("❌ Bus stop not found for systemId: $_currentBusStopId");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bus stop not found')),
+      );
+      return;
+    }
+    final result = await _mapService.cancelRoute(
+      driverId: _driverId!,
+      systemId: _currentBusStopId!,
+      vehicleId: _selectedVehicleId!,
+      destination: _selectedDestinations.first.destination ?? '',
+      destLat: stop.latitude,
+      destLng: stop.longitude,
+      passengerCount: _selectedDestinations.first.passengerCount,
+      tripId: _tripId!,
     );
     if (result['success']) {
       setState(() {
         _currentRoute = null;
-        _currentDestination = null;
+        _selectedDestinations = [];
         _currentBusStopId = null;
         _isTripCardMinimized = false;
+        _tripId = null;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('trip_id');
       await _mapUtils.clearRouteLayer(mapboxMap);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Trip cancelled')),
@@ -589,7 +672,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final screenHeight = MediaQuery.of(context).size.height;
     final safePadding = MediaQuery.of(context).padding.bottom;
     print(
-        "ℹ️ Building UI: _selectedBusStop=${_selectedBusStop?.systemId}, _currentDestination=${_currentDestination?.routeName}, _isTripCardMinimized=$_isTripCardMinimized");
+        "ℹ️ Building UI: _selectedBusStop=${_selectedBusStop?.systemId}, _selectedDestinations=${_selectedDestinations.length}, _isTripCardMinimized=$_isTripCardMinimized");
 
     Widget bottomSheetChild;
     if (_selectedBusStop != null) {
@@ -600,13 +683,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           setState(() => _selectedBusStop = null);
           _animationController?.reverse();
         },
-        () => _acceptTrip(_selectedBusStop!),
+        () => _selectDestinationsAndAcceptTrip(_selectedBusStop!),
       );
-    } else if (_currentDestination != null) {
+    } else if (_selectedDestinations.isNotEmpty) {
       if (_isTripCardMinimized) {
         print("ℹ️ Rendering minimized trip card");
         bottomSheetChild = UIComponents.buildMinimizedTripCard(
-          _currentDestination!,
+          _selectedDestinations,
           _currentRoute,
           _currentBusStopId,
           _busStops,
@@ -618,7 +701,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       } else {
         print("ℹ️ Rendering full trip card");
         bottomSheetChild = UIComponents.buildTripCard(
-          _currentDestination!,
+          _selectedDestinations,
           _currentRoute,
           _currentBusStopId,
           _busStops,
@@ -658,7 +741,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   _isTripCardMinimized = false;
                 });
                 _animationController?.forward();
-              } else if (_currentDestination != null) {
+              } else if (_selectedDestinations.isNotEmpty) {
                 print(
                     "ℹ️ Tapped outside during active trip, toggling minimization");
                 setState(() {
@@ -681,7 +764,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             },
           ),
           if (_isLoading) const Center(child: CircularProgressIndicator()),
-          if (_selectedBusStop != null || _currentDestination != null)
+          if (_selectedBusStop != null || _selectedDestinations.isNotEmpty)
             Positioned(
               bottom: safePadding + 56.0,
               left: 16.0,
@@ -709,6 +792,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                 ),
               ),
             ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: DropdownButton<String>(
+              value: _selectedVehicleId,
+              hint: const Text('Select Vehicle'),
+              items: _vehicles.map((vehicle) {
+                return DropdownMenuItem<String>(
+                  value: vehicle['vehicle_id'],
+                  child: Text(
+                      '${vehicle['brand']} ${vehicle['model']} (${vehicle['plate_number']})'),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => _selectedVehicleId = value);
+              },
+            ),
+          ),
           Positioned(
             top: 16,
             right: 16,
@@ -746,6 +847,128 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
+    );
+  }
+}
+
+class DestinationSelectionDialog extends StatefulWidget {
+  final List<String> availableDestinations;
+  final Function(List<Destination>) onDestinationsSelected;
+
+  const DestinationSelectionDialog({
+    super.key,
+    required this.availableDestinations,
+    required this.onDestinationsSelected,
+  });
+
+  @override
+  State<DestinationSelectionDialog> createState() =>
+      _DestinationSelectionDialogState();
+}
+
+class _DestinationSelectionDialogState
+    extends State<DestinationSelectionDialog> {
+  final MapService _mapService = MapService();
+  final List<Destination> _selectedDestinations = [];
+  final Map<String, TextEditingController> _passengerControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (var dest in widget.availableDestinations) {
+      _passengerControllers[dest] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _passengerControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select Destinations'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.availableDestinations.map((dest) {
+            return Row(
+              children: [
+                Checkbox(
+                  value:
+                      _selectedDestinations.any((d) => d.destination == dest),
+                  onChanged: (value) {
+                    if (value == true) {
+                      setState(() {
+                        _selectedDestinations.add(Destination(
+                          destination: dest,
+                          passengerCount:
+                              int.tryParse(_passengerControllers[dest]!.text) ??
+                                  1,
+                        ));
+                      });
+                    } else {
+                      setState(() {
+                        _selectedDestinations
+                            .removeWhere((d) => d.destination == dest);
+                      });
+                    }
+                  },
+                ),
+                Expanded(child: Text(dest)),
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _passengerControllers[dest],
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Passengers',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      if (_selectedDestinations
+                          .any((d) => d.destination == dest)) {
+                        setState(() {
+                          final index = _selectedDestinations
+                              .indexWhere((d) => d.destination == dest);
+                          final currentDest = _selectedDestinations[index];
+                          _selectedDestinations[index] = Destination(
+                            destination: currentDest.destination,
+                            passengerCount: int.tryParse(value) ?? 1,
+                          );
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_selectedDestinations.isNotEmpty) {
+              widget.onDestinationsSelected(_selectedDestinations);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Please select at least one destination')),
+              );
+            }
+          },
+          child: const Text('Confirm'),
+        ),
+      ],
     );
   }
 }
