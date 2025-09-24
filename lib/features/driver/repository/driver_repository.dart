@@ -34,27 +34,17 @@ class DriverRepository {
     required String accessToken,
   }) async {
     try {
-      FormData formData = FormData.fromMap({
-        'document_type': documentType,
-        'document_number': documentNumber,
-        'expiry_date': expiryDate,
-      });
-
-      if (documentPath != null) {
-        formData.files.add(
-          MapEntry(
-            'file',
-            await MultipartFile.fromFile(
-              documentPath,
-              filename: documentPath.split('/').last, // keep original file name
-            ),
-          ),
-        );
-      }
+      final data = {
+        "document_type": documentType,
+        "document_number": documentNumber,
+        "expiry_date": expiryDate,
+        "document_file_url": documentPath
+      };
+      print("Upload document data: $data");
 
       final response = await _dio.post(
         '/documents',
-        data: formData,
+        data: data,
         options: Options(
           headers: {'Authorization': 'Bearer $accessToken'},
         ),
@@ -98,7 +88,7 @@ class DriverRepository {
     }
   }
 
-  Future<Either<AppFailure, String>> uploadDocumentFile(File file) async {
+  Future<Either<AppFailure, String>> uploadFile(File file) async {
     try {
       await dotenv.load(fileName: '.env');
       final String cloudinaryUrl = dotenv.env["CLOUDINARY_URL"]!;
