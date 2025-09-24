@@ -1,57 +1,55 @@
-// Helper methods
 import 'package:flutter/material.dart';
 
-IconData getDocumentIcon(String documentType) {
-  switch (documentType) {
-    case 'Driver License':
-      return Icons.credit_card;
-    case 'Vehicle Registration':
-      return Icons.directions_car;
-    case 'Insurance Certificate':
-      return Icons.security;
-    case 'Vehicle Inspection':
-      return Icons.build_circle;
-    case 'National ID':
-      return Icons.badge;
-    case 'Medical Certificate':
-      return Icons.local_hospital;
-    case 'Police Clearance':
-      return Icons.verified_user;
-    default:
-      return Icons.description;
+class DriverUtils {
+  static IconData getDocumentIcon(String documentType) {
+    switch (documentType) {
+      case 'License':
+        return Icons.credit_card;
+      case 'Vehicle Registration':
+        return Icons.directions_car;
+      case 'Insurance':
+        return Icons.security;
+      case 'ID Card':
+        return Icons.badge;
+      default:
+        return Icons.description;
+    }
   }
-}
 
-bool isDocumentExpired(String expiryDate) {
-  final expiry = DateTime.parse(expiryDate);
-  return expiry.isBefore(DateTime.now());
-}
+  static bool isDocumentExpired(String expiryDate) {
+    try {
+      final expiry = DateTime.parse(expiryDate);
+      return expiry.isBefore(DateTime.now());
+    } catch (e) {
+      return false;
+    }
+  }
 
-bool isDocumentExpiringSoon(String expiryDate) {
-  final expiry = DateTime.parse(expiryDate);
-  final thirtyDaysFromNow = DateTime.now().add(const Duration(days: 30));
-  return expiry.isBefore(thirtyDaysFromNow) && expiry.isAfter(DateTime.now());
-}
+  static bool isDocumentExpiringSoon(String expiryDate) {
+    try {
+      final expiry = DateTime.parse(expiryDate);
+      final thirtyDaysFromNow = DateTime.now().add(const Duration(days: 30));
+      return expiry.isBefore(thirtyDaysFromNow) && expiry.isAfter(DateTime.now());
+    } catch (e) {
+      return false;
+    }
+  }
 
-List<Map<String, dynamic>> getSampleDocuments() {
-  return [
-    {
-      'type': 'Driver License',
-      'number': 'DL123456789',
-      'expiryDate': '2026-12-31',
-      'status': 'valid',
-    },
-    {
-      'type': 'Vehicle Registration',
-      'number': 'VR987654321',
-      'expiryDate': '2025-10-15',
-      'status': 'expiring_soon',
-    },
-    {
-      'type': 'Insurance Certificate',
-      'number': 'IC456789123',
-      'expiryDate': '2023-06-30',
-      'status': 'expired',
-    },
-  ];
+  static List<String> getDocumentTypes() {
+    return [
+      'license',
+      'vehicle_registration',
+      'insurance',
+      'ID_Card',
+    ];
+  }
+
+  static String formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+    } catch (e) {
+      return dateString;
+    }
+  }
 }

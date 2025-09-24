@@ -8,13 +8,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final int _selectedIndex = 2;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-        child: Center(
-      child: Text("MAP"),
-    ));
+    return Center(
+          child: Text("MAP"),
+        );
   }
 }

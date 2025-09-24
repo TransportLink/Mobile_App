@@ -41,6 +41,7 @@ class MyApp extends ConsumerWidget {
     final currentUser = ref.watch(currentDriverProvider);
 
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: CustomTheme.lightThemeMode,
       home: currentUser == null ? const AuthPage() : HomePage(),
     );

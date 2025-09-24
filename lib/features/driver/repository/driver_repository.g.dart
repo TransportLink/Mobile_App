@@ -49,4 +49,4 @@ final class DriverRepositoryProvider extends $FunctionalProvider<
   }
 }
 
-String _$driverRepositoryHash() => r'7da54155e99a6e6f5636f6920d0f7c03228ae6f8';
+String _$driverRepositoryHash() => r'e2789c8afdddff432b3e1d11564e61cf00677ff3';

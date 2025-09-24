@@ -31,8 +31,7 @@ class MapViewModel extends _$MapViewModel {
 
     return null;
   }
-
-  /// Initialize driver id
+  
   Future<void> initializeDriverId() async {
     state = const AsyncValue.loading();
 

@@ -121,7 +121,7 @@ class DriverModel {
       'license_expiry': license_expiry,
       'national_id': national_id,
       'profile_photo_url': profile_photo_url,
-      'busStops': busStops?.map((x) => x?.toMap()).toList(),
+      'busStops': busStops?.map((x) => x.toMap()).toList(),
       'currentRoute': currentRoute?.toMap(),
       'currentDestination': currentDestination?.toMap(),
       'driverId': driverId,
