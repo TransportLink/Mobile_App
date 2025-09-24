@@ -45,7 +45,7 @@ final class GetAllDocumentsProvider extends $FunctionalProvider<
   }
 }
 
-String _$getAllDocumentsHash() => r'4541de8149669981c4f5f8c6d4e4828c02cca87f';
+String _$getAllDocumentsHash() => r'bec64c0ce21b278d0f63216a3cb17cd219df6368';
 
 @ProviderFor(DriverViewModel)
 const driverViewModelProvider = DriverViewModelProvider._();
@@ -79,7 +79,7 @@ final class DriverViewModelProvider
   }
 }
 
-String _$driverViewModelHash() => r'46ced50f880343cfc9992c44b653291b15a0758e';
+String _$driverViewModelHash() => r'122c9ef874641d7c1654b12df30af9110985e4bf';
 
 abstract class _$DriverViewModel
     extends $Notifier<AsyncValue<DriverDocument>?> {
