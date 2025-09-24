@@ -50,6 +50,20 @@ class MyApp extends ConsumerWidget {
 
 class CustomTheme {
   static final lightThemeMode = ThemeData.light().copyWith(
+      snackBarTheme: SnackBarThemeData(
+        
+        backgroundColor: Colors.grey[900],
+        elevation: 6,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       scaffoldBackgroundColor: AppPalette.backgroundColor,
       appBarTheme: AppBarThemeData().copyWith(
         backgroundColor: AppPalette.backgroundColor,

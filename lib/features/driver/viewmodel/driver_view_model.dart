@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:mobileapp/core/model/driver_document.dart';

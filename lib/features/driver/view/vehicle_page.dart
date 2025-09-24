@@ -242,7 +242,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-
+      automaticallyImplyLeading: false,
       title: const Text(
         'My Vehicles',
         style: TextStyle(

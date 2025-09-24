@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobileapp/core/model/driver_model.dart';
 import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/features/auth/utils/auth_utils.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -45,13 +46,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   void _populateControllers(DriverModel driver) {
-    _fullNameController.text = driver.full_name ?? '';
-    _emailController.text = driver.email ?? '';
-    _phoneController.text = driver.phone_number ?? '';
-    _dobController.text = driver.date_of_birth ?? '';
-    _licenseNumberController.text = driver.license_number ?? '';
-    _licenseExpiryController.text = driver.license_expiry ?? '';
-    _nationalIdController.text = driver.national_id ?? '';
+    _fullNameController.text = driver.full_name;
+    _emailController.text = driver.email;
+    _phoneController.text = driver.phone_number;
+    _dobController.text = driver.date_of_birth;
+    _licenseNumberController.text = driver.license_number;
+    _licenseExpiryController.text = driver.license_expiry;
+    _nationalIdController.text = driver.national_id;
   }
 
   @override
@@ -162,9 +163,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+            onPressed: () {
+              logOut(ref, context);
+            },
+            icon: Icon(Icons.logout)),
         title: const Text(
           'Profile',
           style: TextStyle(
@@ -283,7 +285,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
         const SizedBox(height: 16),
         Text(
-          driver.full_name ?? 'Driver Name',
+          driver.full_name,
           style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -292,7 +294,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
         const SizedBox(height: 4),
         Text(
-          driver.email ?? 'No email',
+          driver.email,
           style: const TextStyle(
             fontSize: 16,
             color: Colors.black54,

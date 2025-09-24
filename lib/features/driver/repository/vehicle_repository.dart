@@ -16,7 +16,7 @@ VehicleRepository vehicleRepository(Ref ref) {
 
 class VehicleRepository {
   final String baseUrl = ServerConstants.baseUrl;
-  late Dio _dio;
+  late final Dio _dio;
 
   VehicleRepository(this._dio);
 

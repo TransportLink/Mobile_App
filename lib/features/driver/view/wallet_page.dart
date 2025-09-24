@@ -71,14 +71,17 @@ class _WalletPageState extends State<WalletPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildBalanceCard(),
-          _buildQuickActions(),
-          _buildEarningsOverview(),
-          _buildTransactionHistory(),
-        ],
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildBalanceCard(),
+            _buildQuickActions(),
+            _buildEarningsOverview(),
+            _buildTransactionHistory(),
+          ],
+        ),
       ),
     );
   }
@@ -87,16 +90,16 @@ class _WalletPageState extends State<WalletPage> {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text(
-        'Wallet',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
+      automaticallyImplyLeading: false,
+      title: Padding(
+        padding: const EdgeInsets.all(0),
+        child: const Text(
+          'Wallet',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       actions: [
