@@ -1,0 +1,65 @@
+// ignore_for_file: public_member_api_docs, sort_constructors_first
+class Destination {
+  final String destinationId;
+  final String driverId;
+  final String routeName;
+  final double startLatitude;
+  final double startLongitude;
+  final double endLatitude;
+  final double endLongitude;
+  final String availabilityStatus;
+
+  Destination({
+    required this.destinationId,
+    required this.driverId,
+    required this.routeName,
+    required this.startLatitude,
+    required this.startLongitude,
+    required this.endLatitude,
+    required this.endLongitude,
+    required this.availabilityStatus,
+  });
+
+  factory Destination.fromJson(Map<String, dynamic> json) {
+    return Destination(
+      destinationId: json['destination_id'] ?? '',
+      driverId: json['driver_id'] ?? '',
+      routeName: json['route_name'] ?? '',
+      startLatitude:
+          double.tryParse(json['start_latitude']?.toString() ?? '') ?? 0.0,
+      startLongitude:
+          double.tryParse(json['start_longitude']?.toString() ?? '') ?? 0.0,
+      endLatitude:
+          double.tryParse(json['end_latitude']?.toString() ?? '') ?? 0.0,
+      endLongitude:
+          double.tryParse(json['end_longitude']?.toString() ?? '') ?? 0.0,
+      availabilityStatus: json['availability_status'] ?? 'not_available',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'destinationId': destinationId,
+      'driverId': driverId,
+      'routeName': routeName,
+      'startLatitude': startLatitude,
+      'startLongitude': startLongitude,
+      'endLatitude': endLatitude,
+      'endLongitude': endLongitude,
+      'availabilityStatus': availabilityStatus,
+    };
+  }
+
+  factory Destination.fromMap(Map<String, dynamic> map) {
+    return Destination(
+      destinationId: map['destinationId'] ?? '',
+      driverId: map['driverId'] ?? '',
+      routeName: map['routeName'] ?? '',
+      startLatitude: map['startLatitude'] ?? 0,
+      startLongitude: map['startLongitude'] ?? 0,
+      endLatitude: map['endLatitude'] ?? 0,
+      endLongitude: map['endLongitude'] ?? 0,
+      availabilityStatus: map['availabilityStatus'] ?? '',
+    );
+  }
+}
