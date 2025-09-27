@@ -1,7 +1,7 @@
 name: mobileapp
 description: A new Flutter project.
 
-publish_to: 'none' # Remove this line if you plan to publish the app
+publish_to: "none" # Remove this line if you plan to publish the app
 
 version: 1.0.0+1
 
@@ -11,30 +11,36 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-    
-    
-    
-
-  # UI and icons
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.0.7
-
-  # Mapbox & location
   mapbox_maps_flutter: ^2.9.0
-  geolocator: ^10.1.0
-  permission_handler: ^11.3.0
-
-  # Storage and networking
-  flutter_secure_storage: ^8.0.0
-  http: ^1.1.0
+  geolocator: ^14.0.2
+  permission_handler: ^12.0.1
+  flutter_secure_storage: ^9.2.4
+  http: ^1.5.0
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+  mime: ^1.0.4
+  dio: ^5.4.0
+  flutter_dotenv: ^6.0.0
+  google_fonts: ^6.3.1
+  fpdart: ^1.1.1
+  riverpod_annotation: ^3.0.0
+  flutter_riverpod: ^3.0.0
+  riverpod_generator: ^3.0.0
+  riverpod_lint: ^3.0.0
+  build_runner: ^2.7.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
+    - assets/images/background/
+    - .env
