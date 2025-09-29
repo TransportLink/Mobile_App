@@ -48,4 +48,4 @@ final class MapRepositoryProvider
   }
 }
 
-String _$mapRepositoryHash() => r'49147bf3e60f41396765d21fbe4c0383fa81713e';
+String _$mapRepositoryHash() => r'6f89fd4d78d7c691dd533e226efe152a69bdd039';

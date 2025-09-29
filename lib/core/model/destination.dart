@@ -1,65 +1,59 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
+
 class Destination {
-  final String destinationId;
-  final String driverId;
-  final String routeName;
-  final double startLatitude;
-  final double startLongitude;
-  final double endLatitude;
-  final double endLongitude;
-  final String availabilityStatus;
+  final String? destination;
+  final double? destLat;
+  final double? destLng;
+  int passengerCount;
+  final double? eta;
 
   Destination({
-    required this.destinationId,
-    required this.driverId,
-    required this.routeName,
-    required this.startLatitude,
-    required this.startLongitude,
-    required this.endLatitude,
-    required this.endLongitude,
-    required this.availabilityStatus,
+    this.destination,
+    this.destLat,
+    this.destLng,
+    required this.passengerCount,
+    this.eta,
   });
 
   factory Destination.fromJson(Map<String, dynamic> json) {
     return Destination(
-      destinationId: json['destination_id'] ?? '',
-      driverId: json['driver_id'] ?? '',
-      routeName: json['route_name'] ?? '',
-      startLatitude:
-          double.tryParse(json['start_latitude']?.toString() ?? '') ?? 0.0,
-      startLongitude:
-          double.tryParse(json['start_longitude']?.toString() ?? '') ?? 0.0,
-      endLatitude:
-          double.tryParse(json['end_latitude']?.toString() ?? '') ?? 0.0,
-      endLongitude:
-          double.tryParse(json['end_longitude']?.toString() ?? '') ?? 0.0,
-      availabilityStatus: json['availability_status'] ?? 'not_available',
+      destination: json['destination']?.toString(),
+      destLat: double.tryParse(json['dest_lat']?.toString() ?? ''),
+      destLng: double.tryParse(json['dest_lng']?.toString() ?? ''),
+      passengerCount:
+          int.tryParse(json['passenger_count']?.toString() ?? '') ?? 0,
+      eta: double.tryParse(json['eta']?.toString() ?? ''),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'passenger_count': passengerCount,
+    };
+    if (destination != null) map['destination'] = destination;
+    if (destLat != null) map['dest_lat'] = destLat;
+    if (destLng != null) map['dest_lng'] = destLng;
+    if (eta != null) map['eta'] = eta;
+    return map;
   }
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
-      'destinationId': destinationId,
-      'driverId': driverId,
-      'routeName': routeName,
-      'startLatitude': startLatitude,
-      'startLongitude': startLongitude,
-      'endLatitude': endLatitude,
-      'endLongitude': endLongitude,
-      'availabilityStatus': availabilityStatus,
+      'destination': destination,
+      'destLat': destLat,
+      'destLng': destLng,
+      'passengerCount': passengerCount,
+      'eta': eta,
     };
   }
 
   factory Destination.fromMap(Map<String, dynamic> map) {
     return Destination(
-      destinationId: map['destinationId'] ?? '',
-      driverId: map['driverId'] ?? '',
-      routeName: map['routeName'] ?? '',
-      startLatitude: map['startLatitude'] ?? 0,
-      startLongitude: map['startLongitude'] ?? 0,
-      endLatitude: map['endLatitude'] ?? 0,
-      endLongitude: map['endLongitude'] ?? 0,
-      availabilityStatus: map['availabilityStatus'] ?? '',
+      destination: map['destination'] != null ? map['destination'] as String : null,
+      destLat: map['destLat'] != null ? map['destLat'] as double : null,
+      destLng: map['destLng'] != null ? map['destLng'] as double : null,
+      passengerCount: map['passengerCount'] as int,
+      eta: map['eta'] != null ? map['eta'] as double : null,
     );
   }
 }
