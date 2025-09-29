@@ -1,13 +1,16 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
+
 class Route {
   final List<List<double>> coordinates;
   final double eta;
   final double distance;
+  final String destination;
 
   Route({
     required this.coordinates,
     required this.eta,
     required this.distance,
+    required this.destination,
   });
 
   factory Route.fromJson(Map<String, dynamic> json) {
@@ -17,6 +20,7 @@ class Route {
           .toList(),
       eta: json['eta']?.toDouble() ?? 0.0,
       distance: json['distance']?.toDouble() ?? 0.0,
+      destination: json['destination']?.toString() ?? '',
     );
   }
 
@@ -25,14 +29,18 @@ class Route {
       'coordinates': coordinates,
       'eta': eta,
       'distance': distance,
+      'destination': destination,
     };
   }
 
   factory Route.fromMap(Map<String, dynamic> map) {
     return Route(
-      coordinates: List<List<double>>.from((map['coordinates'] as List<int>)),
-      eta: map['eta'] ?? 0,
-      distance: map['distance'] ?? 0,
+      coordinates: (map['coordinates'] as List)
+          .map<List<double>>((x) => List<double>.from(x))
+          .toList(),
+      eta: map['eta'] as double,
+      distance: map['distance'] as double,
+      destination: map['destination'] as String,
     );
   }
 }
