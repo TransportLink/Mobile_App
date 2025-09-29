@@ -10,8 +10,9 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [Image.asset("assets/images/dummy_map.png")],
+    return Image.asset(
+      "assets/images/dummy_map.png",
+      height: double.infinity,
     );
   }
 }

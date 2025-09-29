@@ -79,7 +79,7 @@ final class DriverViewModelProvider
   }
 }
 
-String _$driverViewModelHash() => r'122c9ef874641d7c1654b12df30af9110985e4bf';
+String _$driverViewModelHash() => r'44aca84439b6c5cccceffabb1a7375af8c24ef46';
 
 abstract class _$DriverViewModel
     extends $Notifier<AsyncValue<DriverDocument>?> {

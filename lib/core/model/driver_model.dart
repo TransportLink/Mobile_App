@@ -101,7 +101,7 @@ class DriverModel {
           : null,
       currentDestination: map['currentDestination'] != null
           ? Destination.fromMap(
-              map['currentDestination'] as Map<String, dynamic>)
+              map['destination'] as Map<String, dynamic>)
           : null,
       driverId: map['driverId'] ?? '',
       searchRadius: map['searchRadius'] ?? 0,

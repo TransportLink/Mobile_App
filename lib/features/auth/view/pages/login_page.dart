@@ -90,7 +90,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           height: 72,
           color: Colors.white,
           child: Padding(
-            padding: EdgeInsets.only(bottom: 20),
+            padding: EdgeInsets.only(bottom: 8),
             child: isLoading
                 ? InactiveButton("Login")
                 : AppButton(

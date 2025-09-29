@@ -19,7 +19,7 @@ class _NavWithFabState extends State<NavWithFab> {
   final List<Widget> _pages = [
     WalletPage(),
     VehiclesPage(),
-    MapPage(),
+    MapScreen(),
     DriverDocumentsPage(),
     ProfilePage()
   ];
