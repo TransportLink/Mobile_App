@@ -1,89 +1,129 @@
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/transaction.dart';
+import 'package:mobileapp/core/model/driver_earnings.dart';
+import 'package:mobileapp/features/driver/repository/earnings_repository.dart';
+import 'package:mobileapp/core/providers/current_driver_notifier_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class WalletPage extends StatefulWidget {
+class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
   @override
-  State<WalletPage> createState() => _WalletPageState();
+  ConsumerState<WalletPage> createState() => _WalletPageState();
 }
 
-class _WalletPageState extends State<WalletPage> {
+class _WalletPageState extends ConsumerState<WalletPage> {
   String selectedPeriod = 'This Week';
   final List<String> periods = ['Today', 'This Week', 'This Month', 'All Time'];
 
-  // Dummy data
-  final double currentBalance = 2450.75;
-  final double todayEarnings = 120.50;
-  final double weeklyEarnings = 850.25;
-  final double monthlyEarnings = 3200.80;
+  // Real data from API
+  DriverStats? _driverStats;
+  EarningsHistory? _earningsHistory;
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Transaction> transactions = [
-    Transaction(
-      id: '1',
-      type: TransactionType.earning,
-      amount: 45.00,
-      description: 'Trip to Accra Mall',
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      status: TransactionStatus.completed,
-    ),
-    Transaction(
-      id: '2',
-      type: TransactionType.earning,
-      amount: 32.50,
-      description: 'Trip to East Legon',
-      date: DateTime.now().subtract(const Duration(hours: 4)),
-      status: TransactionStatus.completed,
-    ),
-    Transaction(
-      id: '3',
-      type: TransactionType.withdrawal,
-      amount: 200.00,
-      description: 'Bank Transfer - GTBank',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: TransactionStatus.completed,
-    ),
-    Transaction(
-      id: '4',
-      type: TransactionType.earning,
-      amount: 28.75,
-      description: 'Trip to Airport',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: TransactionStatus.completed,
-    ),
-    Transaction(
-      id: '5',
-      type: TransactionType.commission,
-      amount: 15.25,
-      description: 'Platform Commission',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      status: TransactionStatus.pending,
-    ),
-    Transaction(
-      id: '6',
-      type: TransactionType.earning,
-      amount: 67.50,
-      description: 'Trip to Kumasi',
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      status: TransactionStatus.completed,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadEarningsData();
+  }
+
+  Future<void> _loadEarningsData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final driver = ref.read(currentDriverNotifierProvider);
+      if (driver == null) {
+        setState(() {
+          _error = 'Driver not logged in';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final earningsRepo = ref.read(earningsRepositoryProvider);
+      
+      // Load stats
+      final statsResult = await earningsRepo.getDriverStats(driverId: driver.driverId);
+      statsResult.fold(
+        (failure) => setState(() {
+          _error = failure.message;
+          _isLoading = false;
+        }),
+        (stats) => _driverStats = stats,
+      );
+
+      // Load earnings history for selected period
+      final periodParam = selectedPeriod.toLowerCase().replaceAll(' ', '');
+      final historyResult = await earningsRepo.getEarningsHistory(
+        driverId: driver.driverId,
+        period: periodParam == 'thisweek' ? 'week' : periodParam == 'thismonth' ? 'month' : periodParam,
+      );
+      historyResult.fold(
+        (failure) => setState(() {
+          _error = failure.message;
+          _isLoading = false;
+        }),
+        (history) => _earningsHistory = history,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load data: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onPeriodChanged(String newPeriod) {
+    setState(() {
+      selectedPeriod = newPeriod;
+    });
+    _loadEarningsData();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildBalanceCard(),
-              _buildQuickActions(),
-              _buildEarningsOverview(),
-              _buildTransactionHistory(),
-            ],
-          ),
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                        const SizedBox(height: 16),
+                        Text('Error: $_error', textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadEarningsData,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadEarningsData,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildBalanceCard(),
+                          _buildQuickActions(),
+                          _buildEarningsOverview(),
+                          _buildTransactionHistory(),
+                        ],
+                      ),
+                    ),
+                  ),
       ),
     );
   }
@@ -114,6 +154,10 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Widget _buildBalanceCard() {
+    // Calculate current balance as sum of all earnings
+    final currentBalance = _driverStats?.allTime.earnings ?? 0.0;
+    final todayEarnings = _driverStats?.today.earnings ?? 0.0;
+
     return Container(
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(24),
@@ -174,14 +218,16 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               Icon(
                 Icons.trending_up,
-                color: Colors.green.shade300,
+                color: todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
                 size: 16,
               ),
               const SizedBox(width: 4),
               Text(
-                '+₵${todayEarnings.toStringAsFixed(2)} today',
+                todayEarnings > 0 
+                    ? '+₵${todayEarnings.toStringAsFixed(2)} today'
+                    : 'No earnings today',
                 style: TextStyle(
-                  color: Colors.green.shade300,
+                  color: todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -202,7 +248,7 @@ class _WalletPageState extends State<WalletPage> {
             child: _buildActionButton(
               'Withdraw',
               Icons.arrow_upward,
-              () => _showWithdrawModal(),
+              () => _showComingSoon('Withdraw'),
             ),
           ),
           const SizedBox(width: 16),
@@ -210,7 +256,7 @@ class _WalletPageState extends State<WalletPage> {
             child: _buildActionButton(
               'Add Money',
               Icons.arrow_downward,
-              () => _showAddMoneyModal(),
+              () => _showComingSoon('Add Money'),
             ),
           ),
           const SizedBox(width: 16),
@@ -218,10 +264,19 @@ class _WalletPageState extends State<WalletPage> {
             child: _buildActionButton(
               'Transfer',
               Icons.swap_horiz,
-              () => _showTransferModal(),
+              () => _showComingSoon('Transfer'),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature feature coming soon!'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -267,6 +322,10 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Widget _buildEarningsOverview() {
+    final todayStats = _driverStats?.today ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+    final weekStats = _driverStats?.thisWeek ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+    final monthStats = _driverStats?.thisMonth ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+
     return Container(
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(20),
@@ -291,11 +350,11 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               Expanded(
                 child: _buildEarningsStat(
-                    'Today', '₵${todayEarnings.toStringAsFixed(2)}'),
+                    'Today', '₵${todayStats.earnings.toStringAsFixed(2)}'),
               ),
               Expanded(
                 child: _buildEarningsStat(
-                    'This Week', '₵${weeklyEarnings.toStringAsFixed(2)}'),
+                    'This Week', '₵${weekStats.earnings.toStringAsFixed(2)}'),
               ),
             ],
           ),
@@ -304,13 +363,29 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               Expanded(
                 child: _buildEarningsStat(
-                    'This Month', '₵${monthlyEarnings.toStringAsFixed(2)}'),
+                    'This Month', '₵${monthStats.earnings.toStringAsFixed(2)}'),
               ),
               Expanded(
-                child: _buildEarningsStat('Trips', '47'),
+                child: _buildEarningsStat('Trips', '${todayStats.trips}'),
               ),
             ],
           ),
+          // Show hours active if available
+          if (todayStats.hoursActive > 0) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEarningsStat(
+                      'Hours Active', '${todayStats.hoursActive.toStringAsFixed(1)}h'),
+                ),
+                Expanded(
+                  child: _buildEarningsStat(
+                      'Passengers', '${todayStats.passengers}'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -342,6 +417,8 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Widget _buildTransactionHistory() {
+    final earningsList = _earningsHistory?.earnings ?? [];
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -351,7 +428,7 @@ class _WalletPageState extends State<WalletPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Recent Transactions',
+                'Recent Trips',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -373,34 +450,47 @@ class _WalletPageState extends State<WalletPage> {
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() {
-                    selectedPeriod = value!;
-                  });
+                  if (value != null) {
+                    _onPeriodChanged(value);
+                  }
                 },
               ),
             ],
           ),
           const SizedBox(height: 16),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: transactions.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return _buildTransactionItem(transactions[index]);
-            },
-          ),
+          earningsList.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.receipt_long, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No trips yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: earningsList.length > 10 ? 10 : earningsList.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final earning = earningsList[index];
+                    return _buildEarningsItem(earning);
+                  },
+                ),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionItem(Transaction transaction) {
-    final isEarning = transaction.type == TransactionType.earning;
-    final isWithdrawal = transaction.type == TransactionType.withdrawal;
-    final isPending = transaction.status == TransactionStatus.pending;
-
+  Widget _buildEarningsItem(DriverEarnings earning) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -420,24 +510,12 @@ class _WalletPageState extends State<WalletPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isEarning
-                  ? Colors.green.shade50
-                  : isWithdrawal
-                      ? Colors.red.shade50
-                      : Colors.orange.shade50,
+              color: Colors.green.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              isEarning
-                  ? Icons.arrow_downward
-                  : isWithdrawal
-                      ? Icons.arrow_upward
-                      : Icons.percent,
-              color: isEarning
-                  ? Colors.green.shade600
-                  : isWithdrawal
-                      ? Colors.red.shade600
-                      : Colors.orange.shade600,
+              Icons.local_taxi,
+              color: Colors.green.shade600,
               size: 20,
             ),
           ),
@@ -447,7 +525,7 @@ class _WalletPageState extends State<WalletPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.description,
+                  earning.routeSummary,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -455,50 +533,29 @@ class _WalletPageState extends State<WalletPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      _formatDate(transaction.date),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
-                    ),
-                    if (isPending) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Text(
-                          'Pending',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.orange.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  _formatDate(earning.tripCompletedAt),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+                Text(
+                  '${earning.passengerCount} passenger${earning.passengerCount > 1 ? 's' : ''}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
                 ),
               ],
             ),
           ),
           Text(
-            '${isWithdrawal ? '-' : '+'}₵${transaction.amount.toStringAsFixed(2)}',
-            style: TextStyle(
+            '+₵${earning.amount.toStringAsFixed(2)}',
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isEarning
-                  ? Colors.green.shade700
-                  : isWithdrawal
-                      ? Colors.red.shade700
-                      : Colors.orange.shade700,
+              color: Colors.green,
             ),
           ),
         ],
@@ -519,105 +576,5 @@ class _WalletPageState extends State<WalletPage> {
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
-  }
-
-  void _showWithdrawModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) =>
-          _buildActionModal('Withdraw Money', Icons.arrow_upward),
-    );
-  }
-
-  void _showAddMoneyModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) =>
-          _buildActionModal('Add Money', Icons.arrow_downward),
-    );
-  }
-
-  void _showTransferModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) =>
-          _buildActionModal('Transfer Money', Icons.swap_horiz),
-    );
-  }
-
-  Widget _buildActionModal(String title, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.black12,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Colors.black,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'This feature is coming soon!',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

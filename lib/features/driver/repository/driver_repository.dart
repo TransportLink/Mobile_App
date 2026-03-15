@@ -14,7 +14,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'driver_repository.g.dart';
 
 @riverpod
-DriverRepository driverRepository(Ref ref) {
+DriverRepository driverRepository(DriverRepositoryRef ref) {
   final dio = ref.watch(dioProvider);
 
   return DriverRepository(dio);

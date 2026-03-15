@@ -7,7 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'vehicle_view_model.g.dart';
 
 @riverpod
-Future<List<VehicleModel>> getAllVehicles(Ref ref) async {
+Future<List<VehicleModel>> getAllVehicles(GetAllVehiclesRef ref) async {
   final authLocalRepository = ref.watch(authLocalRepositoryProvider);
   final accessToken = authLocalRepository.getToken('access_token');
   

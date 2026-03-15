@@ -6,7 +6,7 @@ import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 part 'dio_provider.g.dart';
 
 @riverpod
-Dio dio(Ref ref) {
+Dio dio(DioRef ref) {
   final authLocalRepository = ref.watch(authLocalRepositoryProvider);
 
   final dio = Dio(

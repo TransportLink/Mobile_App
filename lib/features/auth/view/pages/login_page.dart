@@ -60,7 +60,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     key: formKey,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.start,
-                      spacing: 12,
                       children: [
                         const SizedBox(
                           height: 12,

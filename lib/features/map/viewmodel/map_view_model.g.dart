@@ -6,220 +6,79 @@ part of 'map_view_model.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
+String _$busStopsHash() => r'251a4f320a4044e94c978744bed2bc09d92614f9';
 
-@ProviderFor(MapViewModel)
-const mapViewModelProvider = MapViewModelProvider._();
-
-final class MapViewModelProvider
-    extends $NotifierProvider<MapViewModel, AsyncValue<MapState>?> {
-  const MapViewModelProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'mapViewModelProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$mapViewModelHash();
-
-  @$internal
-  @override
-  MapViewModel create() => MapViewModel();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AsyncValue<MapState>? value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<AsyncValue<MapState>?>(value),
-    );
-  }
-}
-
-String _$mapViewModelHash() => r'bb1d8122554b4192a9a4f5bbd3c5b5562efa94f4';
-
-abstract class _$MapViewModel extends $Notifier<AsyncValue<MapState>?> {
-  AsyncValue<MapState>? build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final created = build();
-    final ref = this.ref as $Ref<AsyncValue<MapState>?, AsyncValue<MapState>?>;
-    final element = ref.element as $ClassProviderElement<
-        AnyNotifier<AsyncValue<MapState>?, AsyncValue<MapState>?>,
-        AsyncValue<MapState>?,
-        Object?,
-        Object?>;
-    element.handleValue(ref, created);
-  }
-}
-
+/// See also [busStops].
 @ProviderFor(busStops)
-const busStopsProvider = BusStopsProvider._();
+final busStopsProvider = AutoDisposeProvider<List<BusStop>>.internal(
+  busStops,
+  name: r'busStopsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$busStopsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class BusStopsProvider
-    extends $FunctionalProvider<List<BusStop>, List<BusStop>, List<BusStop>>
-    with $Provider<List<BusStop>> {
-  const BusStopsProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'busStopsProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+typedef BusStopsRef = AutoDisposeProviderRef<List<BusStop>>;
+String _$currentRouteHash() => r'8654734c2572a835a13c798c7ce1240fea7ab0a1';
 
-  @override
-  String debugGetCreateSourceHash() => _$busStopsHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<BusStop>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<BusStop> create(Ref ref) {
-    return busStops(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<BusStop> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<BusStop>>(value),
-    );
-  }
-}
-
-String _$busStopsHash() => r'0cb76efa8323a516d7ae2af462ab89b084ffc454';
-
+/// See also [currentRoute].
 @ProviderFor(currentRoute)
-const currentRouteProvider = CurrentRouteProvider._();
+final currentRouteProvider = AutoDisposeProvider<Route?>.internal(
+  currentRoute,
+  name: r'currentRouteProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$currentRouteHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class CurrentRouteProvider
-    extends $FunctionalProvider<Route?, Route?, Route?> with $Provider<Route?> {
-  const CurrentRouteProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'currentRouteProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+typedef CurrentRouteRef = AutoDisposeProviderRef<Route?>;
+String _$isOnTripHash() => r'185116ba519fc1224f5a650bae99f8765db9acc9';
 
-  @override
-  String debugGetCreateSourceHash() => _$currentRouteHash();
-
-  @$internal
-  @override
-  $ProviderElement<Route?> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Route? create(Ref ref) {
-    return currentRoute(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Route? value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Route?>(value),
-    );
-  }
-}
-
-String _$currentRouteHash() => r'5dd6ba4dc09cc918bddd5ca0b0b745cdc03c0d87';
-
+/// See also [isOnTrip].
 @ProviderFor(isOnTrip)
-const isOnTripProvider = IsOnTripProvider._();
+final isOnTripProvider = AutoDisposeProvider<bool>.internal(
+  isOnTrip,
+  name: r'isOnTripProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$isOnTripHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class IsOnTripProvider extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  const IsOnTripProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'isOnTripProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$isOnTripHash();
-
-  @$internal
-  @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  bool create(Ref ref) {
-    return isOnTrip(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$isOnTripHash() => r'542473107dcf5469f69c1220457af5de86691956';
-
-@ProviderFor(selectedDestinations)
-const selectedDestinationsProvider = SelectedDestinationsProvider._();
-
-final class SelectedDestinationsProvider extends $FunctionalProvider<
-    List<Destination>,
-    List<Destination>,
-    List<Destination>> with $Provider<List<Destination>> {
-  const SelectedDestinationsProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'selectedDestinationsProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$selectedDestinationsHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<Destination>> $createElement(
-          $ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<Destination> create(Ref ref) {
-    return selectedDestinations(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<Destination> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<Destination>>(value),
-    );
-  }
-}
-
+typedef IsOnTripRef = AutoDisposeProviderRef<bool>;
 String _$selectedDestinationsHash() =>
-    r'62f18848ae0a102a96d6516e90a144f9a0a9b200';
+    r'9702c065916afd5ccba39fbf02d2931ee96fecd2';
+
+/// See also [selectedDestinations].
+@ProviderFor(selectedDestinations)
+final selectedDestinationsProvider =
+    AutoDisposeProvider<List<Destination>>.internal(
+  selectedDestinations,
+  name: r'selectedDestinationsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$selectedDestinationsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef SelectedDestinationsRef = AutoDisposeProviderRef<List<Destination>>;
+String _$mapViewModelHash() => r'a597e054a302e731e21f56514ceef982fba2cc9e';
+
+/// See also [MapViewModel].
+@ProviderFor(MapViewModel)
+final mapViewModelProvider =
+    AutoDisposeNotifierProvider<MapViewModel, AsyncValue<MapState>?>.internal(
+  MapViewModel.new,
+  name: r'mapViewModelProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$mapViewModelHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$MapViewModel = AutoDisposeNotifier<AsyncValue<MapState>?>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

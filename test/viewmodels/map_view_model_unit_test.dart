@@ -5,6 +5,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 
 import 'package:mobileapp/features/map/repository/map_repository.dart';
+import 'package:mobileapp/features/map/repository/driver_location_repository.dart';
 import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
@@ -13,6 +14,7 @@ import 'package:mobileapp/core/providers/current_driver_notifier.dart';
 import 'package:mobileapp/core/model/driver_model.dart';
 
 class MockMapRepository extends Mock implements MapRepository {}
+class MockDriverLocationRepository extends Mock implements DriverLocationRepository {}
 
 class _FakeGeolocator extends GeolocatorPlatform {
   @override
@@ -35,19 +37,22 @@ class _FakeGeolocator extends GeolocatorPlatform {
 
 void main() {
   late MockMapRepository mockMapRepo;
+  late MockDriverLocationRepository mockDriverLocRepo;
 
   setUp(() {
     mockMapRepo = MockMapRepository();
+    mockDriverLocRepo = MockDriverLocationRepository();
     GeolocatorPlatform.instance = _FakeGeolocator();
   });
 
   test('acceptTrip happy path updates MapState', () async {
     final container = ProviderContainer(overrides: [
       mapRepositoryProvider.overrideWithValue(mockMapRepo),
+      driverLocationRepositoryProvider.overrideWithValue(mockDriverLocRepo),
     ]);
 
     // Add a fake current driver
-    container.read(currentDriverProvider.notifier).addCurrentDriver(
+    container.read(currentDriverNotifierProvider.notifier).addCurrentDriver(
           DriverModel(
             id: 'driver-1',
             driverId: 'driver-1',
@@ -104,9 +109,6 @@ void main() {
     container.listen(mapViewModelProvider, (_, __) {}, fireImmediately: true);
     // Call acceptTrip on the provider notifier
     final notifier = container.read(mapViewModelProvider.notifier);
-    // Ensure notifier build runs so _mapRepository is wired
-    notifier.runBuild();
-
     // Set selected vehicle id to satisfy validation
     notifier.updateSelectedVehicle('vehicle-1');
 
@@ -132,10 +134,11 @@ void main() {
   test('cancelTrip happy path clears trip state', () async {
     final container = ProviderContainer(overrides: [
       mapRepositoryProvider.overrideWithValue(mockMapRepo),
+      driverLocationRepositoryProvider.overrideWithValue(mockDriverLocRepo),
     ]);
 
     // Seed current driver
-    container.read(currentDriverProvider.notifier).addCurrentDriver(
+    container.read(currentDriverNotifierProvider.notifier).addCurrentDriver(
           DriverModel(
             id: 'driver-1',
             driverId: 'driver-1',
@@ -154,7 +157,6 @@ void main() {
     // Ensure the autoDispose provider is kept alive during the test
     container.listen(mapViewModelProvider, (_, __) {}, fireImmediately: true);
     final notifier = container.read(mapViewModelProvider.notifier);
-    notifier.runBuild();
     // Simulate that the driver accepted a trip earlier
     notifier.updateSelectedVehicle('vehicle-1');
     // Directly set state to emulate an ongoing trip (simplified)

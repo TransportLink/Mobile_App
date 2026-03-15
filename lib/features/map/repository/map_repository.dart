@@ -16,7 +16,7 @@ import 'package:geolocator/geolocator.dart' as geo;
 part 'map_repository.g.dart';
 
 @riverpod
-MapRepository mapRepository(Ref ref) {
+MapRepository mapRepository(MapRepositoryRef ref) {
   final authLocalRepository = ref.watch(authLocalRepositoryProvider);
   final vehicleRepository = ref.watch(vehicleRepositoryProvider);
 
@@ -361,7 +361,7 @@ class MapRepository {
     }
   }
 
-  // Calculate ETA using Mapbox Directions API
+  // Calculate ETA using OSRM
   Future<double?> calculateEta({
     required double driverLat,
     required double driverLng,
@@ -369,17 +369,10 @@ class MapRepository {
     required double busStopLng,
   }) async {
     try {
-      final mapboxAccessToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
-      if (mapboxAccessToken.isEmpty) {
-        print("❌ MAPBOX_ACCESS_TOKEN is missing in .env");
-        return null;
-      }
-
       final response = await _dio.get(
-        'https://api.mapbox.com/directions/v5/mapbox/driving/$driverLng,$driverLat;$busStopLng,$busStopLat',
+        'https://router.project-osrm.org/route/v1/driving/$driverLng,$driverLat;$busStopLng,$busStopLat',
         queryParameters: {
-          'access_token': mapboxAccessToken,
-          'geometries': 'geojson',
+          'overview': 'false',
         },
       );
 
@@ -388,18 +381,18 @@ class MapRepository {
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final duration = data['routes'][0]['duration']?.toDouble();
           if (duration != null) {
-            print("✅ Calculated ETA: $duration seconds");
+            print("Calculated ETA: $duration seconds");
             return duration;
           }
         }
-        print("❌ No valid routes found in Mapbox response");
+        print("No valid routes found in OSRM response");
         return null;
       } else {
-        print("❌ Mapbox API error: ${response.statusCode} - ${response.data}");
+        print("OSRM API error: ${response.statusCode} - ${response.data}");
         return null;
       }
     } catch (e) {
-      print("❌ Error calculating ETA: $e");
+      print("Error calculating ETA: $e");
       return null;
     }
   }

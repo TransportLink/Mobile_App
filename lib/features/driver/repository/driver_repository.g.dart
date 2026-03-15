@@ -6,47 +6,20 @@ part of 'driver_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
+String _$driverRepositoryHash() => r'1bca77775ef20e08e5012a6fd98eef8b74119f79';
 
+/// See also [driverRepository].
 @ProviderFor(driverRepository)
-const driverRepositoryProvider = DriverRepositoryProvider._();
+final driverRepositoryProvider = AutoDisposeProvider<DriverRepository>.internal(
+  driverRepository,
+  name: r'driverRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$driverRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class DriverRepositoryProvider extends $FunctionalProvider<
-    DriverRepository,
-    DriverRepository,
-    DriverRepository> with $Provider<DriverRepository> {
-  const DriverRepositoryProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'driverRepositoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$driverRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<DriverRepository> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  DriverRepository create(Ref ref) {
-    return driverRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(DriverRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<DriverRepository>(value),
-    );
-  }
-}
-
-String _$driverRepositoryHash() => r'e2789c8afdddff432b3e1d11564e61cf00677ff3';
+typedef DriverRepositoryRef = AutoDisposeProviderRef<DriverRepository>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

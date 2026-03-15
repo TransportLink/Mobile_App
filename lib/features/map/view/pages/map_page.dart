@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:collection/collection.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/destination.dart';
@@ -12,6 +12,8 @@ import 'package:mobileapp/features/driver/viewmodel/vehicle_view_model.dart';
 import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/features/map/utils/helpers.dart';
+import 'package:mobileapp/features/map/utils/map_utils.dart';
+import 'package:mobileapp/core/model/route.dart' as route_models;
 import 'package:permission_handler/permission_handler.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -23,8 +25,8 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen>
     with SingleTickerProviderStateMixin {
-  mapbox.MapboxMap? mapboxMap;
-  mapbox.PointAnnotationManager? pointAnnotationManager;
+  final MapController _mapController = MapController();
+  final MapUtils _mapUtils = MapUtils();
 
   bool _isLoading = true;
   int _selectedIndex = 0;
@@ -32,6 +34,13 @@ class _MapScreenState extends ConsumerState<MapScreen>
   Animation<Offset>? _slideAnimation;
   BusStop? _selectedBusStop;
   bool _isTripCardMinimized = false;
+  List<BusStop> _previousBusStops = [];
+
+  // Map state
+  List<Marker> _busStopMarkers = [];
+  Marker? _userLocationMarker;
+  List<Polyline> _routePolylines = [];
+  LatLng _currentCenter = const LatLng(5.6037, -0.1870); // Accra default
 
   @override
   void initState() {
@@ -63,7 +72,17 @@ class _MapScreenState extends ConsumerState<MapScreen>
   Future<void> _initializeMap() async {
     await _requestLocationPermission();
     await ref.read(mapViewModelProvider.notifier).initializeMap();
+    await _showUserLocation();
     setState(() => _isLoading = false);
+
+    // Listen for bus stop changes to update markers
+    ref.listenManual(mapViewModelProvider, (previous, next) {
+      final busStops = next?.value?.busStops ?? [];
+      if (busStops != _previousBusStops && busStops.isNotEmpty) {
+        _previousBusStops = busStops;
+        _updateMapMarkers(busStops);
+      }
+    });
   }
 
   Future<void> _requestLocationPermission() async {
@@ -104,69 +123,63 @@ class _MapScreenState extends ConsumerState<MapScreen>
     }
   }
 
-  Future<void> _onMapCreated(mapbox.MapboxMap mapboxMap) async {
-    this.mapboxMap = mapboxMap;
-
-    try {
-      pointAnnotationManager =
-          await mapboxMap.annotations.createPointAnnotationManager();
-
-      mapboxMap.location.updateSettings(
-        LocationComponentSettings(
-          enabled: true,
-          pulsingEnabled: true,
-          pulsingColor: Colors.blue.value,
-          pulsingMaxRadius: 100.0,
-          puckBearingEnabled: true,
-          showAccuracyRing: false,
-        ),
-      );
-
-      await _showUserLocation();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error initializing map: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _showUserLocation() async {
-    if (mapboxMap == null) return;
-
     try {
       final position = await geo.Geolocator.getCurrentPosition(
         desiredAccuracy: geo.LocationAccuracy.high,
       );
-
-      await mapboxMap?.flyTo(
-        mapbox.CameraOptions(
-          center: mapbox.Point(
-            coordinates: mapbox.Position(position.longitude, position.latitude),
-          ),
-          zoom: 14.0,
-        ),
-        mapbox.MapAnimationOptions(duration: 1000),
-      );
+      final userLatLng = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _currentCenter = userLatLng;
+        _userLocationMarker = _mapUtils.buildUserLocationMarker(position);
+      });
+      _mapController.move(userLatLng, 14.0);
     } catch (e) {
       print('Error showing user location: $e');
     }
   }
 
-  void _onMapTap(dynamic context) {
+  void _updateMapMarkers(List<BusStop> busStops) {
+    final markers = _mapUtils.buildBusStopMarkers(busStops);
+    setState(() {
+      _busStopMarkers = markers;
+    });
+
+    // Fit bounds
+    geo.Geolocator.getCurrentPosition(
+      desiredAccuracy: geo.LocationAccuracy.high,
+    ).then((position) {
+      final bounds = _mapUtils.calculateCameraBounds(position, busStops);
+      if (bounds != null) {
+        _mapController.fitCamera(
+          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+        );
+      }
+    }).catchError((e) {
+      print('Error fitting map bounds: $e');
+    });
+  }
+
+  Future<void> _showRouteOnMap(route_models.Route? route) async {
+    if (route == null) return;
+    final polyline = _mapUtils.buildRoutePolyline(route);
+    if (polyline != null) {
+      setState(() {
+        _routePolylines = [polyline];
+      });
+    }
+  }
+
+  void _onMapTap(TapPosition tapPosition, LatLng latLng) {
     final mapState = ref.read(mapViewModelProvider)?.value;
     if (mapState == null) return;
-
-    final latitude = context.point.coordinates.lat.toDouble();
-    final longitude = context.point.coordinates.lng.toDouble();
 
     final tappedStop = mapState.busStops.firstWhereOrNull(
       (stop) => Helpers.isPointNearCoordinates(
         stop.latitude,
         stop.longitude,
-        latitude,
-        longitude,
+        latLng.latitude,
+        latLng.longitude,
         tolerance: 0.005,
       ),
     );
@@ -226,6 +239,12 @@ class _MapScreenState extends ConsumerState<MapScreen>
           vehicleId: mapState!.selectedVehicleId!,
         );
 
+    // Show route on map if trip was accepted successfully
+    final updatedState = ref.read(mapViewModelProvider)?.value;
+    if (updatedState?.currentRoute != null) {
+      await _showRouteOnMap(updatedState!.currentRoute);
+    }
+
     setState(() {
       _selectedBusStop = null;
       _isTripCardMinimized = false;
@@ -237,8 +256,8 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   Future<void> _cancelTrip() async {
     await ref.read(mapViewModelProvider.notifier).cancelTrip();
-
     setState(() {
+      _routePolylines = [];
       _isTripCardMinimized = false;
     });
 
@@ -253,8 +272,8 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   Future<void> _arrivedAtDestination() async {
     await ref.read(mapViewModelProvider.notifier).arrivedAtDestination();
-
     setState(() {
+      _routePolylines = [];
       _isTripCardMinimized = false;
     });
 
@@ -294,14 +313,31 @@ class _MapScreenState extends ConsumerState<MapScreen>
     final screenHeight = MediaQuery.of(context).size.height;
     final safePadding = MediaQuery.of(context).padding.bottom;
 
+    // Collect all markers
+    final allMarkers = <Marker>[
+      ..._busStopMarkers,
+      if (_userLocationMarker != null) _userLocationMarker!,
+    ];
+
     return Scaffold(
       body: Stack(
         children: [
-          MapWidget(
-            key: const ValueKey("mapWidget"),
-            styleUri: MapboxStyles.STANDARD,
-            onMapCreated: _onMapCreated,
-            onTapListener: _onMapTap,
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentCenter,
+              initialZoom: 14.0,
+              onTap: _onMapTap,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.airlectric.smarttrotro',
+              ),
+              MarkerLayer(markers: allMarkers),
+              PolylineLayer(polylines: _routePolylines),
+            ],
           ),
 
           if (_isLoading || mapState?.isLoading == true)
@@ -568,47 +604,84 @@ class DestinationSelectionDialog extends StatefulWidget {
 
 class _DestinationSelectionDialogState
     extends State<DestinationSelectionDialog> {
-  final Map<String, int> _selected = {}; // destination -> passenger count
+  final List<Destination> _selectedDestinations = [];
+  final Map<String, TextEditingController> _passengerControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (var dest in widget.availableDestinations) {
+      _passengerControllers[dest] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _passengerControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Select Destinations'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: widget.availableDestinations.length,
-          itemBuilder: (context, index) {
-            final dest = widget.availableDestinations[index];
-            final selectedCount = _selected[dest] ?? 0;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: Text(dest)),
-                  const SizedBox(width: 8),
-                  DropdownButton<int>(
-                    value: selectedCount > 0 ? selectedCount : null,
-                    hint: const Text('0'),
-                    items: List.generate(10, (i) => i + 1).map((i) {
-                      return DropdownMenuItem<int>(value: i, child: Text('$i'));
-                    }).toList(),
-                    onChanged: (val) {
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.availableDestinations.map((dest) {
+            return Row(
+              children: [
+                Checkbox(
+                  value: _selectedDestinations
+                      .any((d) => d.destination == dest),
+                  onChanged: (value) {
+                    if (value == true) {
                       setState(() {
-                        if (val == null || val == 0) {
-                          _selected.remove(dest);
-                        } else {
-                          _selected[dest] = val;
-                        }
+                        _selectedDestinations.add(Destination(
+                          destination: dest,
+                          passengerCount: int.tryParse(
+                                  _passengerControllers[dest]!.text) ??
+                              1,
+                        ));
                       });
+                    } else {
+                      setState(() {
+                        _selectedDestinations
+                            .removeWhere((d) => d.destination == dest);
+                      });
+                    }
+                  },
+                ),
+                Expanded(child: Text(dest)),
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _passengerControllers[dest],
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Pax',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      if (_selectedDestinations
+                          .any((d) => d.destination == dest)) {
+                        setState(() {
+                          final index = _selectedDestinations
+                              .indexWhere((d) => d.destination == dest);
+                          _selectedDestinations[index] = Destination(
+                            destination: dest,
+                            passengerCount: int.tryParse(value) ?? 1,
+                          );
+                        });
+                      }
                     },
                   ),
-                ],
-              ),
+                ),
+              ],
             );
-          },
+          }).toList(),
         ),
       ),
       actions: [
@@ -618,13 +691,17 @@ class _DestinationSelectionDialogState
         ),
         ElevatedButton(
           onPressed: () {
-            final result = _selected.entries
-                .map((e) =>
-                    Destination(destination: e.key, passengerCount: e.value))
-                .toList();
-            Navigator.of(context).pop<List<Destination>>(result);
+            if (_selectedDestinations.isNotEmpty) {
+              Navigator.of(context)
+                  .pop<List<Destination>>(_selectedDestinations);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Please select at least one destination')),
+              );
+            }
           },
-          child: const Text('OK'),
+          child: const Text('Confirm'),
         ),
       ],
     );

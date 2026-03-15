@@ -6,45 +6,19 @@ part of 'dio_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
+String _$dioHash() => r'49a4e10611d61fff1875f336662fa4a0847a7b30';
 
+/// See also [dio].
 @ProviderFor(dio)
-const dioProvider = DioProvider._();
+final dioProvider = AutoDisposeProvider<Dio>.internal(
+  dio,
+  name: r'dioProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$dioHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
-    with $Provider<Dio> {
-  const DioProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'dioProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$dioHash();
-
-  @$internal
-  @override
-  $ProviderElement<Dio> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Dio create(Ref ref) {
-    return dio(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Dio value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Dio>(value),
-    );
-  }
-}
-
-String _$dioHash() => r'e3e6e8df04b0eb93b0cade0205dc10c1c67c0bea';
+typedef DioRef = AutoDisposeProviderRef<Dio>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

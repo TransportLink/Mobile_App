@@ -19,7 +19,7 @@ class AuthViewmodel extends _$AuthViewmodel {
   AsyncValue<DriverModel>? build() {
     _authRemoteRepository = ref.watch(authRemoteRepositoryProvider);
     _authLocalRepository = ref.watch(authLocalRepositoryProvider);
-    _currentDriverNotifier = ref.watch(currentDriverProvider.notifier);
+    _currentDriverNotifier = ref.watch(currentDriverNotifierProvider.notifier);
 
     return null;
   }
@@ -110,7 +110,7 @@ class AuthViewmodel extends _$AuthViewmodel {
       return null;
     }
 
-    final currentDriver = ref.read(currentDriverProvider);
+    final currentDriver = ref.read(currentDriverNotifierProvider);
 
     final res = await _authRemoteRepository.updateDriverProfile(
         data: currentDriver!.toMap(),

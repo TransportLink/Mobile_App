@@ -6,49 +6,22 @@ part of 'auth_remote_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
-
-@ProviderFor(authRemoteRepository)
-const authRemoteRepositoryProvider = AuthRemoteRepositoryProvider._();
-
-final class AuthRemoteRepositoryProvider extends $FunctionalProvider<
-    AuthRemoteRepository,
-    AuthRemoteRepository,
-    AuthRemoteRepository> with $Provider<AuthRemoteRepository> {
-  const AuthRemoteRepositoryProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'authRemoteRepositoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$authRemoteRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<AuthRemoteRepository> $createElement(
-          $ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  AuthRemoteRepository create(Ref ref) {
-    return authRemoteRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AuthRemoteRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<AuthRemoteRepository>(value),
-    );
-  }
-}
-
 String _$authRemoteRepositoryHash() =>
-    r'681cc87dd1957b7902a5bebce2d2719dee9ae637';
+    r'96bd17f4a9fcc480b0fa2a5eb42bd7c488014a9c';
+
+/// See also [authRemoteRepository].
+@ProviderFor(authRemoteRepository)
+final authRemoteRepositoryProvider =
+    AutoDisposeProvider<AuthRemoteRepository>.internal(
+  authRemoteRepository,
+  name: r'authRemoteRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authRemoteRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef AuthRemoteRepositoryRef = AutoDisposeProviderRef<AuthRemoteRepository>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

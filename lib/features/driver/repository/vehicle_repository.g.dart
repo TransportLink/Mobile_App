@@ -6,48 +6,21 @@ part of 'vehicle_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
+String _$vehicleRepositoryHash() => r'749be9adadea7ea55d0e4750a71ac75e2a62b03c';
 
+/// See also [vehicleRepository].
 @ProviderFor(vehicleRepository)
-const vehicleRepositoryProvider = VehicleRepositoryProvider._();
+final vehicleRepositoryProvider =
+    AutoDisposeProvider<VehicleRepository>.internal(
+  vehicleRepository,
+  name: r'vehicleRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$vehicleRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class VehicleRepositoryProvider extends $FunctionalProvider<
-    VehicleRepository,
-    VehicleRepository,
-    VehicleRepository> with $Provider<VehicleRepository> {
-  const VehicleRepositoryProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'vehicleRepositoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$vehicleRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<VehicleRepository> $createElement(
-          $ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  VehicleRepository create(Ref ref) {
-    return vehicleRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(VehicleRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<VehicleRepository>(value),
-    );
-  }
-}
-
-String _$vehicleRepositoryHash() => r'012e5d942c780767dad71e92022b5797f4cdcf68';
+typedef VehicleRepositoryRef = AutoDisposeProviderRef<VehicleRepository>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

@@ -6,46 +6,20 @@ part of 'map_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, type=warning
+String _$mapRepositoryHash() => r'ed96ccf1cf27aba8f6e1cb62f042d9dad6f8b013';
 
+/// See also [mapRepository].
 @ProviderFor(mapRepository)
-const mapRepositoryProvider = MapRepositoryProvider._();
+final mapRepositoryProvider = AutoDisposeProvider<MapRepository>.internal(
+  mapRepository,
+  name: r'mapRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$mapRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-final class MapRepositoryProvider
-    extends $FunctionalProvider<MapRepository, MapRepository, MapRepository>
-    with $Provider<MapRepository> {
-  const MapRepositoryProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'mapRepositoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
-
-  @override
-  String debugGetCreateSourceHash() => _$mapRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<MapRepository> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  MapRepository create(Ref ref) {
-    return mapRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(MapRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<MapRepository>(value),
-    );
-  }
-}
-
-String _$mapRepositoryHash() => r'6f89fd4d78d7c691dd533e226efe152a69bdd039';
+typedef MapRepositoryRef = AutoDisposeProviderRef<MapRepository>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

@@ -112,7 +112,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final currentDriver = ref.read(currentDriverProvider);
+    final currentDriver = ref.read(currentDriverNotifierProvider);
     if (currentDriver == null) return;
 
     // Update the current driver notifier with form values
@@ -126,7 +126,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       national_id: _nationalIdController.text,
     );
 
-    ref.read(currentDriverProvider.notifier).addCurrentDriver(updatedDriver);
+    ref.read(currentDriverNotifierProvider.notifier).addCurrentDriver(updatedDriver);
 
     // Call update method
     await ref.read(authViewmodelProvider.notifier).updateDriverData(
@@ -151,7 +151,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewmodelProvider);
-    final currentDriver = ref.watch(currentDriverProvider);
+    final currentDriver = ref.watch(currentDriverNotifierProvider);
 
     if (currentDriver != null && !_isEditing) {
       _populateControllers(currentDriver);
@@ -482,7 +482,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 _isEditing = false;
                 _selectedImage = null;
               });
-              final currentDriver = ref.read(currentDriverProvider);
+              final currentDriver = ref.read(currentDriverNotifierProvider);
               if (currentDriver != null) {
                 _populateControllers(currentDriver);
               }

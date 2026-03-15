@@ -94,7 +94,6 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                     key: formKey,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      spacing: 12,
                       children: [
                         Image.asset(
                           "assets/images/welcome.png",

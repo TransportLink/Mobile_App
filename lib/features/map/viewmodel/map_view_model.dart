@@ -7,6 +7,7 @@ import 'package:mobileapp/core/model/route.dart';
 import 'package:mobileapp/core/providers/current_driver_notifier.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/features/map/repository/map_repository.dart';
+import 'package:mobileapp/features/map/repository/driver_location_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,7 +16,8 @@ part 'map_view_model.g.dart';
 @riverpod
 class MapViewModel extends _$MapViewModel {
   late MapRepository _mapRepository;
-  
+  late DriverLocationRepository _driverLocationRepository;
+
   Timer? _locationUpdateTimer;
   Timer? _busStopUpdateTimer;
   Timer? _routeUpdateTimer;
@@ -23,7 +25,8 @@ class MapViewModel extends _$MapViewModel {
   @override
   AsyncValue<MapState>? build() {
     _mapRepository = ref.watch(mapRepositoryProvider);
-    
+    _driverLocationRepository = ref.watch(driverLocationRepositoryProvider);
+
     return const AsyncValue.data(MapState());
   }
 
@@ -59,41 +62,62 @@ class MapViewModel extends _$MapViewModel {
     double? longitude,
     double? radius,
   }) async {
-    try {
-      final currentState = state?.value ?? const MapState();
-      
-      geo.Position? position;
-      if (latitude == null || longitude == null) {
-        position = await geo.Geolocator.getCurrentPosition(
-          desiredAccuracy: geo.LocationAccuracy.high,
-        );
-        latitude = position.latitude;
-        longitude = position.longitude;
-      }
+    const maxRetries = 3;
+    var retryCount = 0;
 
-      final searchRadius = radius ?? currentState.searchRadius;
+    while (retryCount < maxRetries) {
+      try {
+        final currentState = state?.value ?? const MapState();
 
-      final result = await _mapRepository.fetchBusStops(
-        latitude: latitude,
-        longitude: longitude,
-        radius: searchRadius,
-      );
-
-      switch (result) {
-        case Left(value: final error):
-          state = AsyncValue.error(error.message, StackTrace.current);
-          break;
-        case Right(value: final busStops):
-          final newState = currentState.copyWith(
-            busStops: busStops,
-            searchRadius: searchRadius,
+        geo.Position? position;
+        if (latitude == null || longitude == null) {
+          position = await geo.Geolocator.getCurrentPosition(
+            desiredAccuracy: geo.LocationAccuracy.high,
           );
-          state = AsyncValue.data(newState);
-          break;
+          latitude = position.latitude;
+          longitude = position.longitude;
+        }
+
+        final searchRadius = radius ?? currentState.searchRadius;
+
+        final result = await _mapRepository.fetchBusStops(
+          latitude: latitude,
+          longitude: longitude,
+          radius: searchRadius,
+        );
+
+        switch (result) {
+          case Left(value: final error):
+            if (error.message.contains('503')) {
+              retryCount++;
+              print('Retrying fetch bus stops ($retryCount/$maxRetries)');
+              await Future.delayed(const Duration(seconds: 2));
+              continue;
+            }
+            state = AsyncValue.error(error.message, StackTrace.current);
+            return;
+          case Right(value: final busStops):
+            final newState = currentState.copyWith(
+              busStops: busStops,
+              searchRadius: searchRadius,
+            );
+            state = AsyncValue.data(newState);
+            return;
+        }
+      } catch (e, st) {
+        if (e.toString().contains('503')) {
+          retryCount++;
+          print('Retrying fetch bus stops ($retryCount/$maxRetries)');
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        state = AsyncValue.error(e, st);
+        return;
       }
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
     }
+    state = AsyncValue.error(
+        'Failed to fetch bus stops after $maxRetries retries',
+        StackTrace.current);
   }
 
   Future<void> acceptTrip({
@@ -102,7 +126,7 @@ class MapViewModel extends _$MapViewModel {
     required String vehicleId,
   }) async {
     try {
-      final currentDriver = ref.read(currentDriverProvider);
+      final currentDriver = ref.read(currentDriverNotifierProvider);
       if (currentDriver?.driverId == null) {
         state = AsyncValue.error('Driver ID not found', StackTrace.current);
         return;
@@ -171,7 +195,7 @@ class MapViewModel extends _$MapViewModel {
         return;
       }
 
-      final currentDriver = ref.read(currentDriverProvider);
+      final currentDriver = ref.read(currentDriverNotifierProvider);
       if (currentDriver?.driverId == null) {
         state = AsyncValue.error('Driver ID not found', StackTrace.current);
         return;
@@ -207,6 +231,16 @@ class MapViewModel extends _$MapViewModel {
   }
 
   Future<void> arrivedAtDestination() async {
+    final currentState = state?.value;
+    if (currentState != null && currentState.selectedDestinations.isNotEmpty) {
+      final firstDest = currentState.selectedDestinations.first;
+      if (firstDest.destination != null) {
+        await _driverLocationRepository.updateDestination(
+          firstDest.destination!,
+          'available',
+        );
+      }
+    }
     await _clearTripState();
   }
 
@@ -229,8 +263,34 @@ class MapViewModel extends _$MapViewModel {
     _locationUpdateTimer = Timer.periodic(
       const Duration(seconds: 10),
       (timer) async {
-        // Location updates are handled by the view layer
-        // This timer can be used for other periodic tasks
+        try {
+          final position = await geo.Geolocator.getCurrentPosition(
+            desiredAccuracy: geo.LocationAccuracy.high,
+          );
+
+          // Reverse geocode current position
+          final addressResult = await _mapRepository.fetchReverseGeocoding(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
+          String address = 'Unknown';
+          switch (addressResult) {
+            case Right(value: final data):
+              address = data['place_name']?.toString() ?? 'Unknown';
+              break;
+            case Left():
+              break;
+          }
+
+          // Update driver location on the auth service
+          await _driverLocationRepository.updateDriverLocation(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            address: address,
+          );
+        } catch (e) {
+          print('Error updating driver location: $e');
+        }
       },
     );
   }
@@ -271,7 +331,7 @@ class MapViewModel extends _$MapViewModel {
       return;
     }
 
-    final currentDriver = ref.read(currentDriverProvider);
+    final currentDriver = ref.read(currentDriverNotifierProvider);
     if (currentDriver?.driverId == null ||
         currentState.tripId == null ||
         currentState.currentBusStopId == null ||
@@ -288,6 +348,14 @@ class MapViewModel extends _$MapViewModel {
         (stop) => stop.systemId == currentState.currentBusStopId,
       );
 
+      // Calculate ETA to the bus stop using OSRM
+      final eta = await _mapRepository.calculateEta(
+        driverLat: position.latitude,
+        driverLng: position.longitude,
+        busStopLat: busStop.latitude,
+        busStopLng: busStop.longitude,
+      );
+
       final result = await _mapRepository.updateLocation(
         driverId: currentDriver!.driverId!,
         systemId: currentState.currentBusStopId!,
@@ -295,6 +363,7 @@ class MapViewModel extends _$MapViewModel {
         tripId: currentState.tripId!,
         busStopLat: busStop.latitude,
         busStopLng: busStop.longitude,
+        eta: eta,
       );
 
       switch (result) {
@@ -333,8 +402,7 @@ class MapViewModel extends _$MapViewModel {
     state = AsyncValue.data(newState);
   }
 
-  @override
-  void dispose() {
+  void _cancelTimers() {
     _locationUpdateTimer?.cancel();
     _busStopUpdateTimer?.cancel();
     _routeUpdateTimer?.cancel();
@@ -342,25 +410,25 @@ class MapViewModel extends _$MapViewModel {
 }
 
 @riverpod
-List<BusStop> busStops(Ref ref) {
+List<BusStop> busStops(BusStopsRef ref) {
   final mapState = ref.watch(mapViewModelProvider);
   return mapState?.value?.busStops ?? [];
 }
 
 @riverpod
-Route? currentRoute(Ref ref) {
+Route? currentRoute(CurrentRouteRef ref) {
   final mapState = ref.watch(mapViewModelProvider);
   return mapState?.value?.currentRoute;
 }
 
 @riverpod
-bool isOnTrip(Ref ref) {
+bool isOnTrip(IsOnTripRef ref) {
   final mapState = ref.watch(mapViewModelProvider);
   return mapState?.value?.isOnTrip ?? false;
 }
 
 @riverpod
-List<Destination> selectedDestinations(Ref ref) {
+List<Destination> selectedDestinations(SelectedDestinationsRef ref) {
   final mapState = ref.watch(mapViewModelProvider);
   return mapState?.value?.selectedDestinations ?? [];
 }

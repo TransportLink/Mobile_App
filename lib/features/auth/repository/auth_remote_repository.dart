@@ -12,7 +12,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'auth_remote_repository.g.dart';
 
 @riverpod
-AuthRemoteRepository authRemoteRepository(Ref ref) {
+AuthRemoteRepository authRemoteRepository(AuthRemoteRepositoryRef ref) {
   final dio = ref.watch(dioProvider);
   return AuthRemoteRepository(dio);
 }

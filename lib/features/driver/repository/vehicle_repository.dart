@@ -9,7 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'vehicle_repository.g.dart';
 
 @riverpod
-VehicleRepository vehicleRepository(Ref ref) {
+VehicleRepository vehicleRepository(VehicleRepositoryRef ref) {
   final dio = ref.read(dioProvider);
   return VehicleRepository(dio);
 }

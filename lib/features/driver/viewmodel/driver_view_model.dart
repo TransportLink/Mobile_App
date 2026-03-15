@@ -10,8 +10,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'driver_view_model.g.dart';
 
 @riverpod
-Future<List<DriverDocument>> getAllDocuments(Ref ref) async {
-  final currentDriver = ref.watch(currentDriverProvider);
+Future<List<DriverDocument>> getAllDocuments(GetAllDocumentsRef ref) async {
+  final currentDriver = ref.watch(currentDriverNotifierProvider);
 
   if (currentDriver == null) {
     throw 'No current driver found';

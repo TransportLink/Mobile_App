@@ -455,7 +455,7 @@ class _AddEditVehicleModalState extends ConsumerState<AddEditVehicleModal> {
     bool isRequired = true,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: controller.text.isEmpty ? null : controller.text,
+      value: controller.text.isEmpty ? null : controller.text,
       decoration: InputDecoration(
         labelText: label,
         errorText: errorText,

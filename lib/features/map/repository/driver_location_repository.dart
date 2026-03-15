@@ -9,7 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'driver_location_repository.g.dart';
 
 @riverpod
-DriverLocationRepository driverLocationRepository(Ref ref) {
+DriverLocationRepository driverLocationRepository(DriverLocationRepositoryRef ref) {
   final localAuthRepo = ref.watch(authLocalRepositoryProvider);
   return DriverLocationRepository(localAuthRepo);
 }
