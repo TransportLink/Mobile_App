@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/model/demand.dart';
+import 'package:mobileapp/core/services/sse_client.dart';
+import 'package:mobileapp/core/constants/server_constants.dart';
 import 'package:mobileapp/features/driver/repository/demand_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mobileapp/core/providers/current_driver_notifier_provider.dart';
@@ -8,9 +10,92 @@ part 'demand_viewmodel.g.dart';
 
 @riverpod
 class DemandViewmodel extends _$DemandViewmodel {
+  SSEClient? _sseClient;
+
   @override
   DemandState build() {
+    // Initialize SSE connection on first build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupSSE();
+    });
     return const DemandState.initial();
+  }
+
+  void _setupSSE() {
+    final sseUrl = '${ServerConstants.microserviceUrl}stream/updates';
+    _sseClient = SSEClient(url: sseUrl);
+    
+    _sseClient!.onEvent = (type, data) {
+      _handleSSEEvent(type, data);
+    };
+    
+    _sseClient!.onError = (error) {
+      // Silently handle SSE errors - don't disrupt UI
+      // The demand data is still valid from last poll
+    };
+    
+    _sseClient!.connect();
+  }
+
+  void _handleSSEEvent(String type, dynamic data) {
+    switch (type) {
+      case SSEEventType.demandUpdate:
+        // Refresh demand data when passenger count changes
+        final systemId = data['system_id'];
+        final destination = data['destination'];
+        final newCount = data['count'];
+        
+        // Update local state if we have data
+        if (state.demand != null) {
+          final updatedStops = state.demand!.busStops.map((stop) {
+            if (stop.systemId == systemId && stop.demand.containsKey(destination)) {
+              // Create updated stop with new passenger count
+              final updatedDemand = Map<String, DestinationDemand>.from(stop.demand);
+              updatedDemand[destination] = DestinationDemand(
+                passengers: newCount,
+                estimatedRevenue: updatedDemand[destination].estimatedRevenue,
+              );
+              
+              return BusStopOpportunity(
+                systemId: stop.systemId,
+                location: stop.location,
+                coordinates: stop.coordinates,
+                distanceKm: stop.distanceKm,
+                etaMinutes: stop.etaMinutes,
+                demand: updatedDemand,
+                totalPassengers: stop.totalPassengers,
+                driversEnRoute: stop.driversEnRoute,
+                revenueScore: stop.revenueScore,
+                demandLevel: stop.demandLevel,
+                destinations: stop.destinations,
+                estimatedRevenue: stop.estimatedRevenue,
+              );
+            }
+            return stop;
+          }).toList();
+          
+          state = state.copyWith(
+            demand: DemandData(
+              driverLocation: state.demand!.driverLocation,
+              searchRadiusKm: state.demand!.searchRadiusKm,
+              timestamp: DateTime.now().toIso8601String(),
+              summary: state.demand!.summary,
+              busStops: updatedStops,
+            ),
+          );
+        }
+        break;
+        
+      case SSEEventType.tripStarted:
+      case SSEEventType.tripCompleted:
+        // Refresh demand data on trip events
+        loadDemand();
+        break;
+        
+      case SSEEventType.systemStatus:
+        // Handle system status changes if needed
+        break;
+    }
   }
 
   /// Load demand data from API
@@ -48,6 +133,12 @@ class DemandViewmodel extends _$DemandViewmodel {
   /// Refresh demand data
   Future<void> refresh() async {
     await loadDemand();
+  }
+
+  @override
+  void dispose() {
+    _sseClient?.dispose();
+    super.dispose();
   }
 }
 
