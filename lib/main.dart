@@ -8,6 +8,8 @@ import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:mobileapp/features/home/view/pages/auth_page.dart';
 import 'package:mobileapp/features/home/view/pages/home_page.dart';
 
+import 'package:mobileapp/core/services/notification_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final container = ProviderContainer();
@@ -15,6 +17,10 @@ Future<void> main() async {
 
   // Load .env file
   await dotenv.load(fileName: ".env");
+
+  // Initialize notifications
+  await NotificationService().initialize();
+  await NotificationService().scheduleDailySummary();
 
   runApp(
     UncontrolledProviderScope(container: container, child: MyApp()),
@@ -39,7 +45,6 @@ class MyApp extends ConsumerWidget {
 class CustomTheme {
   static final lightThemeMode = ThemeData.light().copyWith(
       snackBarTheme: SnackBarThemeData(
-        
         backgroundColor: Colors.grey[900],
         elevation: 6,
         behavior: SnackBarBehavior.floating,

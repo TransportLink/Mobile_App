@@ -4,10 +4,10 @@ import 'package:mobileapp/features/driver/viewmodel/demand_viewmodel.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Demand List Page - Task 2.5
-/// 
+///
 /// Shows ranked bus stop opportunities for drivers.
 /// Replaces map-first approach with glanceable list view.
-/// 
+///
 /// Design principle: Drivers can't interpret a map while driving.
 /// A ranked list is glanceable and actionable.
 class DemandListPage extends ConsumerStatefulWidget {
@@ -34,7 +34,6 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
     return Scaffold(
       appBar: _buildAppBar(),
       body: _buildBody(demandState),
-      onRefresh: () => ref.read(demandViewmodelProvider.notifier).loadDemand(),
     );
   }
 
@@ -56,7 +55,8 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
       ),
       actions: [
         IconButton(
-          onPressed: () => ref.read(demandViewmodelProvider.notifier).loadDemand(),
+          onPressed: () =>
+              ref.read(demandViewmodelProvider.notifier).loadDemand(),
           icon: const Icon(Icons.refresh, color: Colors.black),
         ),
       ],
@@ -78,7 +78,8 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
             Text('Error: ${state.error}', textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.read(demandViewmodelProvider.notifier).loadDemand(),
+              onPressed: () =>
+                  ref.read(demandViewmodelProvider.notifier).loadDemand(),
               child: const Text('Retry'),
             ),
           ],
@@ -145,7 +146,8 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -184,12 +186,14 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
               children: [
                 _buildSummaryChip(
                   icon: Icons.access_time,
-                  label: '${bestOpp.etaMinutes?.toStringAsFixed(1) ?? '--'} min',
+                  label:
+                      '${bestOpp.etaMinutes?.toStringAsFixed(1) ?? '--'} min',
                 ),
                 const SizedBox(width: 8),
                 _buildSummaryChip(
                   icon: Icons.trending_up,
-                  label: 'Score ${(bestOpp.revenueScore ?? 0).toStringAsFixed(2)}',
+                  label:
+                      'Score ${(bestOpp.revenueScore ?? 0).toStringAsFixed(2)}',
                 ),
               ],
             ),
@@ -237,7 +241,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
 
   Widget _buildOpportunityCard(BusStopOpportunity opp, int rank) {
     final isHighDemand = opp.demandLevel == 'high';
-    final hasCompetition = opp.driversEnRoute > 0;
+    final hasCompetition = (opp.driversEnRoute ?? 0) > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -302,18 +306,22 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(Icons.directions_walk, size: 14, color: Colors.grey[600]),
+                              Icon(Icons.directions_walk,
+                                  size: 14, color: Colors.grey[600]),
                               const SizedBox(width: 4),
                               Text(
                                 '${opp.distanceKm?.toStringAsFixed(1) ?? '--'} km',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 12),
                               ),
                               const SizedBox(width: 12),
-                              Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                              Icon(Icons.access_time,
+                                  size: 14, color: Colors.grey[600]),
                               const SizedBox(width: 4),
                               Text(
                                 '${opp.etaMinutes?.toStringAsFixed(1) ?? '--'} min',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 12),
                               ),
                             ],
                           ),
@@ -346,7 +354,8 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                               runSpacing: 6,
                               children: opp.destinations.take(3).map((dest) {
                                 return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[100],
                                     borderRadius: BorderRadius.circular(6),
@@ -364,14 +373,16 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                     // Competition indicator
                     if (hasCompetition)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.orange[50],
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.people, size: 16, color: Colors.orange[700]),
+                            Icon(Icons.people,
+                                size: 16, color: Colors.orange[700]),
                             const SizedBox(height: 2),
                             Text(
                               '${opp.driversEnRoute} coming',
@@ -506,15 +517,16 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
               ),
               const SizedBox(height: 12),
               ...opp.destinations.map((dest) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Text(dest, style: const TextStyle(fontSize: 14)),
-                  ],
-                ),
-              )),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on,
+                            size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Text(dest, style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  )),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/transaction.dart';
 import 'package:mobileapp/core/model/driver_earnings.dart';
 import 'package:mobileapp/features/driver/repository/earnings_repository.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier_provider.dart';
+import 'package:mobileapp/core/providers/current_driver_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
@@ -44,10 +44,13 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         return;
       }
 
+      final driverId = driver.driverId ?? '';
+      if (driverId.isEmpty) return;
+
       final earningsRepo = ref.read(earningsRepositoryProvider);
-      
+
       // Load stats
-      final statsResult = await earningsRepo.getDriverStats(driverId: driver.driverId);
+      final statsResult = await earningsRepo.getDriverStats(driverId: driverId);
       statsResult.fold(
         (failure) => setState(() {
           _error = failure.message;
@@ -59,8 +62,12 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       // Load earnings history for selected period
       final periodParam = selectedPeriod.toLowerCase().replaceAll(' ', '');
       final historyResult = await earningsRepo.getEarningsHistory(
-        driverId: driver.driverId,
-        period: periodParam == 'thisweek' ? 'week' : periodParam == 'thismonth' ? 'month' : periodParam,
+        driverId: driverId,
+        period: periodParam == 'thisweek'
+            ? 'week'
+            : periodParam == 'thismonth'
+                ? 'month'
+                : periodParam,
       );
       historyResult.fold(
         (failure) => setState(() {
@@ -100,7 +107,8 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                        Icon(Icons.error_outline,
+                            size: 48, color: Colors.red[300]),
                         const SizedBox(height: 16),
                         Text('Error: $_error', textAlign: TextAlign.center),
                         const SizedBox(height: 16),
@@ -223,11 +231,12 @@ class _WalletPageState extends ConsumerState<WalletPage> {
               ),
               const SizedBox(width: 4),
               Text(
-                todayEarnings > 0 
+                todayEarnings > 0
                     ? '+₵${todayEarnings.toStringAsFixed(2)} today'
                     : 'No earnings today',
                 style: TextStyle(
-                  color: todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
+                  color:
+                      todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -322,9 +331,12 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   Widget _buildEarningsOverview() {
-    final todayStats = _driverStats?.today ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
-    final weekStats = _driverStats?.thisWeek ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
-    final monthStats = _driverStats?.thisMonth ?? PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+    final todayStats = _driverStats?.today ??
+        PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+    final weekStats = _driverStats?.thisWeek ??
+        PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
+    final monthStats = _driverStats?.thisMonth ??
+        PeriodStats(trips: 0, passengers: 0, earnings: 0, hoursActive: 0);
 
     return Container(
       margin: const EdgeInsets.all(24),
@@ -376,8 +388,8 @@ class _WalletPageState extends ConsumerState<WalletPage> {
             Row(
               children: [
                 Expanded(
-                  child: _buildEarningsStat(
-                      'Hours Active', '${todayStats.hoursActive.toStringAsFixed(1)}h'),
+                  child: _buildEarningsStat('Hours Active',
+                      '${todayStats.hoursActive.toStringAsFixed(1)}h'),
                 ),
                 Expanded(
                   child: _buildEarningsStat(
@@ -464,7 +476,8 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        Icon(Icons.receipt_long, size: 48, color: Colors.grey[400]),
+                        Icon(Icons.receipt_long,
+                            size: 48, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
                           'No trips yet',
@@ -477,8 +490,10 @@ class _WalletPageState extends ConsumerState<WalletPage> {
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: earningsList.length > 10 ? 10 : earningsList.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemCount:
+                      earningsList.length > 10 ? 10 : earningsList.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final earning = earningsList[index];
                     return _buildEarningsItem(earning);

@@ -5,6 +5,7 @@ import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/destination.dart';
 import 'package:mobileapp/core/model/route.dart';
 import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/services/notification_service.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/features/map/repository/map_repository.dart';
 import 'package:mobileapp/features/map/repository/driver_location_repository.dart';
@@ -21,6 +22,7 @@ class MapViewModel extends _$MapViewModel {
   Timer? _locationUpdateTimer;
   Timer? _busStopUpdateTimer;
   Timer? _routeUpdateTimer;
+  bool _approachingNotified = false;
 
   @override
   AsyncValue<MapState>? build() {
@@ -36,22 +38,21 @@ class MapViewModel extends _$MapViewModel {
     try {
       final prefs = await SharedPreferences.getInstance();
       final tripId = prefs.getInt('trip_id');
-      
+
       final currentState = state?.value ?? const MapState();
       final newState = currentState.copyWith(
         tripId: tripId,
         isOnTrip: tripId != null,
       );
-      
+
       state = AsyncValue.data(newState);
 
       _startLocationUpdates();
       _startBusStopUpdates();
-      
+
       if (tripId != null) {
         _startRouteUpdates();
       }
-      
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -136,10 +137,12 @@ class MapViewModel extends _$MapViewModel {
         desiredAccuracy: geo.LocationAccuracy.high,
       );
 
-      final destinationsData = destinations.map((d) => {
-        'destination': d.destination,
-        'passenger_count': d.passengerCount,
-      }).toList();
+      final destinationsData = destinations
+          .map((d) => {
+                'destination': d.destination,
+                'passenger_count': d.passengerCount,
+              })
+          .toList();
 
       final result = await _mapRepository.fetchRoute(
         driverId: currentDriver!.driverId!,
@@ -158,7 +161,7 @@ class MapViewModel extends _$MapViewModel {
         case Right(value: final routeData):
           final route = Route.fromJson(routeData['route']);
           final tripId = routeData['trip_id'] as int;
-          
+
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt('trip_id', tripId);
 
@@ -171,9 +174,22 @@ class MapViewModel extends _$MapViewModel {
             tripId: tripId,
             isOnTrip: true,
           );
-          
+
           state = AsyncValue.data(newState);
-          
+
+          // Show trip confirmed notification
+          final totalPassengers =
+              destinations.fold(0, (sum, d) => sum + d.passengerCount);
+          NotificationService().showTripConfirmed(
+            tripId: tripId,
+            stopName: busStop.systemId,
+            etaMinutes: route.eta / 60,
+            passengerCount: totalPassengers,
+            destination: destinations.isNotEmpty
+                ? (destinations.first.destination ?? '')
+                : '',
+          );
+
           _startRouteUpdates();
           break;
       }
@@ -185,8 +201,8 @@ class MapViewModel extends _$MapViewModel {
   Future<void> cancelTrip() async {
     try {
       final currentState = state?.value;
-      if (currentState == null || 
-          !currentState.isOnTrip || 
+      if (currentState == null ||
+          !currentState.isOnTrip ||
           currentState.tripId == null ||
           currentState.currentBusStopId == null ||
           currentState.selectedVehicleId == null ||
@@ -248,7 +264,7 @@ class MapViewModel extends _$MapViewModel {
     final currentState = state?.value ?? const MapState();
     final newState = currentState.copyWith(searchRadius: radius);
     state = AsyncValue.data(newState);
-    
+
     await fetchBusStops(radius: radius);
   }
 
@@ -348,6 +364,26 @@ class MapViewModel extends _$MapViewModel {
         (stop) => stop.systemId == currentState.currentBusStopId,
       );
 
+      // Check if approaching bus stop (within 500m)
+      final distanceToBusStop = geo.Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        busStop.latitude,
+        busStop.longitude,
+      );
+      if (distanceToBusStop < 500 && !_approachingNotified) {
+        _approachingNotified = true;
+        final totalPassengers = currentState.selectedDestinations
+            .fold(0, (sum, d) => sum + d.passengerCount);
+        NotificationService().showApproachingBusStop(
+          stopName: currentState.currentBusStopId ?? '',
+          passengerCount: totalPassengers,
+          destination: currentState.selectedDestinations.isNotEmpty
+              ? (currentState.selectedDestinations.first.destination ?? '')
+              : '',
+        );
+      }
+
       // Calculate ETA to the bus stop using OSRM
       final eta = await _mapRepository.calculateEta(
         driverLat: position.latitude,
@@ -386,6 +422,7 @@ class MapViewModel extends _$MapViewModel {
   Future<void> _clearTripState() async {
     _routeUpdateTimer?.cancel();
     _routeUpdateTimer = null;
+    _approachingNotified = false;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('trip_id');
@@ -398,7 +435,7 @@ class MapViewModel extends _$MapViewModel {
       tripId: null,
       isOnTrip: false,
     );
-    
+
     state = AsyncValue.data(newState);
   }
 

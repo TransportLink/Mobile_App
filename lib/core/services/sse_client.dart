@@ -4,18 +4,18 @@ import 'package:http/http.dart' as http;
 import 'package:mobileapp/core/constants/server_constants.dart';
 
 /// SSE (Server-Sent Events) client for real-time demand updates.
-/// 
+///
 /// Task 2.6: Real-time updates without polling
 class SSEClient {
   final String url;
   final Duration reconnectDelay;
-  
+
   http.Client? _client;
   StreamSubscription? _subscription;
-  
+
   bool _isConnected = false;
   bool _isManualDisconnect = false;
-  
+
   // Event callbacks
   Function(String type, dynamic data)? onEvent;
   Function()? onConnected;
@@ -42,25 +42,22 @@ class SSEClient {
     request.headers['Accept'] = 'text/event-stream';
     request.headers['Cache-Control'] = 'no-cache';
 
-    try {
-      _subscription = _client!.send(request).then((response) {
-        if (response.statusCode == 200) {
-          _isConnected = true;
-          onConnected?.call();
-          
-          // Listen to stream
-          response.stream.transform(utf8.decoder).listen(
-            _handleMessage,
-            onError: _handleError,
-            onDone: _handleDone,
-          );
-        } else {
-          _handleError('Connection failed: ${response.statusCode}');
-        }
-      }).catchError(_handleError);
-    } catch (e) {
-      _handleError(e);
-    }
+    _client!.send(request).then((response) {
+      if (response.statusCode == 200) {
+        _isConnected = true;
+        onConnected?.call();
+
+        _subscription = response.stream.transform(utf8.decoder).listen(
+              _handleMessage,
+              onError: _handleError,
+              onDone: _handleDone,
+            );
+      } else {
+        _handleError('Connection failed: ${response.statusCode}');
+      }
+    }).catchError((error) {
+      _handleError(error);
+    });
   }
 
   void _handleMessage(String message) {
@@ -95,7 +92,7 @@ class SSEClient {
   void _handleError(dynamic error) {
     _isConnected = false;
     onError?.call(error.toString());
-    
+
     if (!_isManualDisconnect) {
       _scheduleReconnect();
     }
@@ -104,7 +101,7 @@ class SSEClient {
   void _handleDone() {
     _isConnected = false;
     onDisconnected?.call();
-    
+
     if (!_isManualDisconnect) {
       _scheduleReconnect();
     }
