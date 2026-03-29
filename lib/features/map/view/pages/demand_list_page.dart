@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/demand.dart';
 import 'package:mobileapp/features/driver/viewmodel/demand_viewmodel.dart';
+import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
+import 'package:mobileapp/features/map/view/widgets/nav_with_fab.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Demand List Page - Task 2.5
@@ -21,9 +23,10 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   @override
   void initState() {
     super.initState();
-    // Load demand data on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(demandViewmodelProvider.notifier).loadDemand();
+      final notifier = ref.read(demandViewmodelProvider.notifier);
+      notifier.loadDemand();
+      notifier.startAutoRefresh();
     });
   }
 
@@ -38,27 +41,34 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final demandState = ref.watch(demandViewmodelProvider);
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
       automaticallyImplyLeading: false,
-      title: const Padding(
-        padding: EdgeInsets.all(0),
-        child: Text(
-          'Nearby Opportunities',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
+      title: const Text(
+        'Nearby Opportunities',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
         ),
       ),
       actions: [
-        IconButton(
-          onPressed: () =>
-              ref.read(demandViewmodelProvider.notifier).loadDemand(),
-          icon: const Icon(Icons.refresh, color: Colors.black),
-        ),
+        if (demandState.isRefreshing)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        else
+          IconButton(
+            onPressed: () => ref.read(demandViewmodelProvider.notifier).loadDemand(),
+            icon: const Icon(Icons.refresh, color: Colors.black),
+          ),
       ],
     );
   }
@@ -451,6 +461,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   }
 
   void _showOpportunityDetails(BusStopOpportunity opp) {
+    final parentContext = context; // capture parent context for tab switching
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -533,7 +544,17 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to navigation/route guidance
+                    // Set focus request so map zooms to this bus stop
+                    if (opp.coordinates != null && opp.systemId != null) {
+                      ref.read(pendingFocusBusStopProvider.notifier).state =
+                          FocusBusStopRequest(
+                        systemId: opp.systemId!,
+                        latitude: opp.coordinates!.latitude,
+                        longitude: opp.coordinates!.longitude,
+                      );
+                    }
+                    // Switch to Map tab
+                    NavTabController.of(parentContext)?.switchToTab(0);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
@@ -543,7 +564,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                     ),
                   ),
                   child: const Text(
-                    'Navigate Here',
+                    'Go to Map',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,

@@ -6,7 +6,7 @@ part of 'demand_viewmodel.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$demandViewmodelHash() => r'8922fabcd04446d61e907e40442dab7e95a620a0';
+String _$demandViewmodelHash() => r'97d28047aed1123cfe56e440cc97069ba23ea13e';
 
 /// See also [DemandViewmodel].
 @ProviderFor(DemandViewmodel)

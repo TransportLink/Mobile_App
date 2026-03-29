@@ -43,13 +43,13 @@ class EarningsRepository {
         }
       } else {
         return Left(AppFailure(
-          'Failed to load stats: ${response.statusCode}',
+          'Could not load your stats. Please try again.',
         ));
       }
     } on DioException catch (e) {
       return Left(AppFailure(_handleDioError(e)));
     } catch (e) {
-      return Left(AppFailure('Unexpected error: $e'));
+      return Left(AppFailure('Something went wrong. Please try again.'));
     }
   }
 
@@ -77,31 +77,31 @@ class EarningsRepository {
         }
       } else {
         return Left(AppFailure(
-          'Failed to load earnings: ${response.statusCode}',
+          'Could not load your earnings. Please try again.',
         ));
       }
     } on DioException catch (e) {
       return Left(AppFailure(_handleDioError(e)));
     } catch (e) {
-      return Left(AppFailure('Unexpected error: $e'));
+      return Left(AppFailure('Something went wrong. Please try again.'));
     }
   }
 
   String _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout) {
-      return 'Connection timeout. Please check your internet.';
+      return 'Connection is slow. Please check your internet and try again.';
     } else if (e.type == DioExceptionType.receiveTimeout) {
-      return 'Response timeout. Please try again.';
+      return 'Server is taking too long. Please try again.';
     } else if (e.type == DioExceptionType.badResponse) {
       final data = e.response?.data;
       if (data is Map<String, dynamic>) {
         return data['message'] ?? data['error'] ?? 'Request failed';
       }
-      return 'Request failed with status ${e.response?.statusCode}';
+      return 'Request failed. Please try again.';
     } else if (e.type == DioExceptionType.connectionError) {
       return 'Cannot connect to server. Please try again later.';
     }
-    return 'Network error. Please try again.';
+    return 'Could not connect. Please check your internet and try again.';
   }
 }
 

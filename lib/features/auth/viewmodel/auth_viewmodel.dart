@@ -1,8 +1,9 @@
 // ignore_for_file: strict_top_level_inference, non_constant_identifier_names
 
 import 'package:fpdart/fpdart.dart';
-import 'package:mobileapp/core/model/driver_model.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/model/user_model.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
+import 'package:mobileapp/core/providers/user_role_provider.dart';
 import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 import 'package:mobileapp/features/auth/repository/auth_remote_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -13,13 +14,13 @@ part 'auth_viewmodel.g.dart';
 class AuthViewmodel extends _$AuthViewmodel {
   late AuthRemoteRepository _authRemoteRepository;
   late AuthLocalRepository _authLocalRepository;
-  late CurrentDriverNotifier _currentDriverNotifier;
+  late CurrentUserNotifier _currentUserNotifier;
 
   @override
-  AsyncValue<DriverModel>? build() {
+  AsyncValue<UserModel>? build() {
     _authRemoteRepository = ref.watch(authRemoteRepositoryProvider);
     _authLocalRepository = ref.watch(authLocalRepositoryProvider);
-    _currentDriverNotifier = ref.watch(currentDriverNotifierProvider.notifier);
+    _currentUserNotifier = ref.watch(currentUserNotifierProvider.notifier);
 
     return null;
   }
@@ -28,7 +29,7 @@ class AuthViewmodel extends _$AuthViewmodel {
     await _authLocalRepository.init();
   }
 
-  Future<void> registerDriver({
+  Future<void> registerUser({
     required full_name,
     required email,
     required password,
@@ -40,7 +41,7 @@ class AuthViewmodel extends _$AuthViewmodel {
   }) async {
     state = const AsyncValue.loading();
 
-    final res = await _authRemoteRepository.registerDriver(
+    final res = await _authRemoteRepository.registerUser(
         fullName: full_name,
         email: email,
         phoneNumber: phone_number,
@@ -53,7 +54,18 @@ class AuthViewmodel extends _$AuthViewmodel {
     final val = switch (res) {
       Left(value: final l) => state =
           AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final _) => state
+      Right(value: final r) => state = AsyncValue.data(
+          UserModel(
+            id: r['driver_id'] ?? '',
+            full_name: full_name,
+            email: email,
+            password_hash: '',
+            phone_number: phone_number,
+            date_of_birth: date_of_birth,
+            license_number: license_number,
+            license_expiry: license_expiry,
+            national_id: national_id,
+          )),
     };
 
     print(val);
@@ -68,22 +80,31 @@ class AuthViewmodel extends _$AuthViewmodel {
     final val = switch (res) {
       Left(value: final l) => state =
           AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final r) => await _loginDriverSuccess(r)
+      Right(value: final r) => await _loginUserSuccess(r)
     };
 
     print(val.value);
   }
 
-  Future<AsyncValue<DriverModel>> _loginDriverSuccess(
+  Future<AsyncValue<UserModel>> _loginUserSuccess(
       Map<String, dynamic> token) async {
     _authLocalRepository.setToken("access_token", token["access_token"]);
     _authLocalRepository.setToken("refresh_token", token["refresh_token"]);
-    DriverModel? driverModel = await getDriverData();
+    UserModel? user = await getUserData();
 
-    return state = AsyncValue.data(driverModel!);
+    // Infer and persist role from profile if not already set
+    if (user != null) {
+      final currentRole = ref.read(userRoleProvider);
+      if (currentRole == UserRole.unknown) {
+        final role = user.isDriver ? UserRole.driver : UserRole.passenger;
+        await ref.read(userRoleProvider.notifier).setRole(role);
+      }
+    }
+
+    return state = AsyncValue.data(user!);
   }
 
-  Future<DriverModel?> getDriverData() async {
+  Future<UserModel?> getUserData() async {
     state = const AsyncValue.loading();
     final token = _authLocalRepository.getToken('access_token');
 
@@ -91,18 +112,18 @@ class AuthViewmodel extends _$AuthViewmodel {
       return null;
     }
 
-    final res = await _authRemoteRepository.fetchDriverProfile();
+    final res = await _authRemoteRepository.fetchUserProfile();
     final val = switch (res) {
       Left(value: final l) => state =
           AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final r) => _fetchDriverDataSuccess(r)
+      Right(value: final r) => _fetchUserDataSuccess(r)
     };
 
     print(val.value);
     return val.value;
   }
 
-  Future<DriverModel?> updateDriverData(String? profilePhotoPath) async {
+  Future<UserModel?> updateUserData(String? profilePhotoPath) async {
     state = const AsyncValue.loading();
     final token = _authLocalRepository.getToken('access_token');
 
@@ -110,29 +131,29 @@ class AuthViewmodel extends _$AuthViewmodel {
       return null;
     }
 
-    final currentDriver = ref.read(currentDriverNotifierProvider);
+    final currentUser = ref.read(currentUserNotifierProvider);
 
-    final res = await _authRemoteRepository.updateDriverProfile(
-        data: currentDriver!.toMap(),
+    final res = await _authRemoteRepository.updateUserProfile(
+        data: currentUser!.toMap(),
         accessToken: token,
         photoPath: profilePhotoPath);
     final val = switch (res) {
       Left(value: final l) => state =
           AsyncValue.error(l.message, StackTrace.current),
-      Right(value: final _) => await _updateDriverDataSuccess()
+      Right(value: final _) => await _updateUserDataSuccess()
     };
 
     print(val.value);
     return val.value;
   }
 
-  Future<AsyncValue<DriverModel>> _updateDriverDataSuccess() async {
-    final currentDriver = await getDriverData();
-    return state = AsyncValue.data(currentDriver!);
+  Future<AsyncValue<UserModel>> _updateUserDataSuccess() async {
+    final currentUser = await getUserData();
+    return state = AsyncValue.data(currentUser!);
   }
 
-  AsyncValue<DriverModel> _fetchDriverDataSuccess(DriverModel driver) {
-    _currentDriverNotifier.addCurrentDriver(driver);
-    return state = AsyncValue.data(driver);
+  AsyncValue<UserModel> _fetchUserDataSuccess(UserModel user) {
+    _currentUserNotifier.addCurrentUser(user);
+    return state = AsyncValue.data(user);
   }
 }

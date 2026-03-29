@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobileapp/core/providers/user_role_provider.dart';
 import 'package:mobileapp/core/utils/app_utils.dart';
 import 'package:mobileapp/core/widgets/app_button.dart';
 import 'package:mobileapp/core/widgets/custom_field.dart';
@@ -9,10 +10,12 @@ import 'package:mobileapp/features/auth/view/widgets/inactive_button.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 
 class SignupPage extends ConsumerStatefulWidget {
-  const SignupPage({super.key});
+  final UserRole role;
+
+  const SignupPage({super.key, required this.role});
 
   @override
-  _SignupPageState createState() => _SignupPageState();
+  ConsumerState<SignupPage> createState() => _SignupPageState();
 }
 
 class _SignupPageState extends ConsumerState<SignupPage> {
@@ -26,6 +29,8 @@ class _SignupPageState extends ConsumerState<SignupPage> {
   final TextEditingController nationalIdController = TextEditingController();
   final formKey = GlobalKey<FormState>();
 
+  bool get _isDriver => widget.role == UserRole.driver;
+
   @override
   void dispose() {
     fullNameController.dispose();
@@ -36,7 +41,6 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     licenseExpiryController.dispose();
     licenseNumberController.dispose();
     nationalIdController.dispose();
-
     super.dispose();
   }
 
@@ -52,13 +56,9 @@ class _SignupPageState extends ConsumerState<SignupPage> {
             : DateTime.now().add(const Duration(days: 100000)));
 
     if (picked != null) {
+      final formatted = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       setState(() {
-        if (controller == dobController) {
-          dobController.text = "${picked.year}-${picked.month}-${picked.day}";
-        } else {
-          licenseExpiryController.text =
-              "${picked.year}-${picked.month}-${picked.day}";
-        }
+        controller.text = formatted;
       });
     }
   }
@@ -72,19 +72,33 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     ref.listen(authViewmodelProvider, (_, next) {
       next?.when(
           data: (data) {
-            showSnackBar(context, "Account created successfully! Please login");
+            // Persist the role before navigating to login
+            ref.read(userRoleProvider.notifier).setRole(widget.role);
+            showSnackBar(
+              context,
+              "Account created successfully! Please login",
+              isError: false,
+            );
             Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const LoginPage()));
           },
           error: (error, stackTrace) {
-            showSnackBar(context, error.toString());
+            final errorMessage = error.toString().replaceAll('Exception: ', '');
+            showSnackBar(
+              context,
+              errorMessage,
+              isError: true,
+              duration: Duration(seconds: 5),
+            );
           },
           loading: () {});
     });
 
+    final title = _isDriver ? 'Create Driver Account' : 'Create Account';
+
     return SafeArea(
       child: Scaffold(
-        appBar: AppBar(centerTitle: true, title: Text("Create an account")),
+        appBar: AppBar(centerTitle: true, title: Text(title)),
         body: isLoading
             ? Loader()
             : Container(
@@ -99,6 +113,37 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                           "assets/images/welcome.png",
                           fit: BoxFit.cover,
                         ),
+                        // Role indicator
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: _isDriver ? Colors.green.shade50 : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _isDriver ? Colors.green.shade200 : Colors.blue.shade200,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isDriver ? Icons.directions_car : Icons.hail_rounded,
+                                color: _isDriver ? Colors.green.shade700 : Colors.blue.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                _isDriver ? 'Signing up as a Driver' : 'Signing up as a Passenger',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: _isDriver ? Colors.green.shade700 : Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Common fields (both roles)
                         CustomField(
                             label: "Full name",
                             textEditingController: fullNameController,
@@ -120,32 +165,36 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                             textEditingController: phoneNumberController,
                             icon: Icon(Icons.phone),
                             hintText: "e.g, 0123456789"),
-                        CustomField(
-                            label: "Date of Birth",
-                            textEditingController: dobController,
-                            icon: Icon(Icons.calendar_today_rounded),
-                            onTap: () async {
-                              await _selectDate(context, dobController);
-                            },
-                            hintText: "YYYY-MM-DD"),
-                        CustomField(
-                            label: "License Number",
-                            textEditingController: licenseNumberController,
-                            icon: Icon(Icons.numbers),
-                            hintText: "0000-0000-0000"),
-                        CustomField(
-                            label: "License Expiry",
-                            textEditingController: licenseExpiryController,
-                            icon: Icon(Icons.calendar_today_rounded),
-                            onTap: () async {
-                              await _selectDate(context, licenseExpiryController);
-                            },
-                            hintText: "YYYY-MM-DD"),
-                        CustomField(
-                            label: "National ID",
-                            textEditingController: nationalIdController,
-                            icon: Icon(Icons.numbers),
-                            hintText: "0000-0000-0000")
+                        // Driver-only fields
+                        if (_isDriver) ...[
+                          CustomField(
+                              label: "Date of Birth",
+                              textEditingController: dobController,
+                              icon: Icon(Icons.calendar_today_rounded),
+                              onTap: () async {
+                                await _selectDate(context, dobController);
+                              },
+                              hintText: "YYYY-MM-DD"),
+                          CustomField(
+                              label: "License Number",
+                              textEditingController: licenseNumberController,
+                              icon: Icon(Icons.numbers),
+                              hintText: "0000-0000-0000"),
+                          CustomField(
+                              label: "License Expiry",
+                              textEditingController: licenseExpiryController,
+                              icon: Icon(Icons.calendar_today_rounded),
+                              onTap: () async {
+                                await _selectDate(
+                                    context, licenseExpiryController);
+                              },
+                              hintText: "YYYY-MM-DD"),
+                          CustomField(
+                              label: "National ID",
+                              textEditingController: nationalIdController,
+                              icon: Icon(Icons.numbers),
+                              hintText: "0000-0000-0000"),
+                        ],
                       ],
                     ),
                   ),
@@ -164,16 +213,23 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                     } else {
                       await ref
                           .read(authViewmodelProvider.notifier)
-                          .registerDriver(
+                          .registerUser(
                               full_name: fullNameController.text,
                               email: emailController.text,
                               password: passwordController.text,
                               phone_number: phoneNumberController.text,
-                              date_of_birth: dobController.text,
-                              license_number:
-                                  "LIC${licenseNumberController.text}",
-                              license_expiry: licenseExpiryController.text,
-                              national_id: "NID${nationalIdController.text}");
+                              date_of_birth: _isDriver
+                                  ? dobController.text
+                                  : "",
+                              license_number: _isDriver
+                                  ? "LIC${licenseNumberController.text}"
+                                  : "",
+                              license_expiry: _isDriver
+                                  ? licenseExpiryController.text
+                                  : "",
+                              national_id: _isDriver
+                                  ? "NID${nationalIdController.text}"
+                                  : "");
                     }
                   }),
         ),

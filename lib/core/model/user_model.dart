@@ -6,7 +6,7 @@ import 'package:mobileapp/core/model/route.dart' as route_models;
 
 // ignore_for_file: non_constant_identifier_names
 
-class DriverModel {
+class UserModel {
   final String id;
   final String full_name;
   final String email;
@@ -23,7 +23,7 @@ class DriverModel {
   final String? driverId;
   final double? searchRadius;
 
-  DriverModel({
+  UserModel({
     required this.id,
     required this.full_name,
     required this.email,
@@ -41,7 +41,11 @@ class DriverModel {
     this.searchRadius,
   });
 
-  DriverModel copyWith({
+  /// Infer role from profile data — drivers have a license number
+  bool get isDriver => license_number.isNotEmpty;
+  bool get isPassenger => license_number.isEmpty;
+
+  UserModel copyWith({
     String? id,
     String? full_name,
     String? email,
@@ -58,7 +62,7 @@ class DriverModel {
     String? driverId,
     double? searchRadius,
   }) {
-    return DriverModel(
+    return UserModel(
         id: id ?? this.id,
         full_name: full_name ?? this.full_name,
         email: email ?? this.email,
@@ -76,9 +80,9 @@ class DriverModel {
         profile_photo_url: profile_photo_url ?? this.profile_photo_url);
   }
 
-  factory DriverModel.fromMap(Map<String, dynamic> map) {
-    return DriverModel(
-      id: map['id'] ?? '',
+  factory UserModel.fromMap(Map<String, dynamic> map) {
+    return UserModel(
+      id: map['id'] ?? map['driver_id'] ?? '',
       full_name: map['full_name'] ?? '',
       email: map['email'] ?? '',
       password_hash: map['password_hash'] ?? '',
@@ -103,7 +107,7 @@ class DriverModel {
           ? Destination.fromMap(
               map['destination'] as Map<String, dynamic>)
           : null,
-      driverId: map['driverId'] ?? '',
+      driverId: map['driverId'] ?? map['driver_id'] ?? '',
       searchRadius: map['searchRadius'] ?? 0,
     );
   }

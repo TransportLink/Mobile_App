@@ -6,7 +6,7 @@ part of 'map_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$mapRepositoryHash() => r'ed96ccf1cf27aba8f6e1cb62f042d9dad6f8b013';
+String _$mapRepositoryHash() => r'95f600873be29a7c4b129344a9a524256c73f724';
 
 /// See also [mapRepository].
 @ProviderFor(mapRepository)

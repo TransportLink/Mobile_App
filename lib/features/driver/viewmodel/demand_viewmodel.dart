@@ -1,28 +1,38 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mobileapp/core/model/demand.dart';
 import 'package:mobileapp/core/services/sse_client.dart';
 import 'package:mobileapp/core/services/notification_service.dart';
 import 'package:mobileapp/core/constants/server_constants.dart';
 import 'package:mobileapp/features/driver/repository/demand_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
 
 part 'demand_viewmodel.g.dart';
 
 @riverpod
 class DemandViewmodel extends _$DemandViewmodel {
   SSEClient? _sseClient;
+  Timer? _refreshTimer;
 
   @override
   DemandState build() {
+    ref.onDispose(() {
+      _refreshTimer?.cancel();
+      _sseClient?.dispose();
+    });
     return const DemandState.initial();
+  }
+
+  void startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => loadDemand(silent: true));
   }
 
   void setupSSE() {
     _sseClient?.dispose();
-    final sseUrl = '${ServerConstants.microserviceUrl}stream/updates';
+    final sseUrl = '${ServerConstants.mapServiceUrl}stream/updates';
     _sseClient = SSEClient(url: sseUrl);
 
     _sseClient!.onEvent = (type, data) {
@@ -144,20 +154,33 @@ class DemandViewmodel extends _$DemandViewmodel {
     }
   }
 
-  Future<void> loadDemand({double radius = 10.0}) async {
-    state = const DemandState.loading();
+  /// [silent] = true keeps existing data visible while refreshing in background.
+  Future<void> loadDemand({double radius = 10.0, bool silent = false}) async {
+    final driver = ref.read(currentUserNotifierProvider);
+    if (driver == null) {
+      state = const DemandState.error('Please log in to view demand.');
+      return;
+    }
+
+    // Show spinner only on first load; keep old data visible on refresh
+    if (!silent && state.demand == null) {
+      state = const DemandState.loading();
+    } else if (!silent) {
+      state = state.copyWith(isRefreshing: true);
+    }
 
     try {
-      final driver = ref.read(currentDriverNotifierProvider);
-      if (driver == null) {
-        state = const DemandState.error('Driver not logged in');
-        return;
-      }
-
-      // Use default location for now (Legon, Accra)
-      // TODO: Get real-time driver location from GPS
-      const latitude = 5.6037;
-      const longitude = -0.1870;
+      // Use last known GPS position (instant), fall back to Accra centre
+      double latitude = 5.6037;
+      double longitude = -0.1870;
+      try {
+        final pos = await geo.Geolocator.getLastKnownPosition() ??
+            await geo.Geolocator.getCurrentPosition(
+              desiredAccuracy: geo.LocationAccuracy.medium,
+            );
+        latitude = pos.latitude;
+        longitude = pos.longitude;
+      } catch (_) {}
 
       final demandRepo = ref.read(demandRepositoryProvider);
       final result = await demandRepo.getDemandBroadcast(
@@ -167,17 +190,26 @@ class DemandViewmodel extends _$DemandViewmodel {
       );
 
       result.fold(
-        (failure) => state = DemandState.error(failure.message),
+        (failure) {
+          // On silent refresh failure keep existing data — just clear spinner
+          if (state.demand != null) {
+            state = state.copyWith(isRefreshing: false, lastError: failure.message);
+          } else {
+            state = DemandState.error(failure.message);
+          }
+        },
         (demand) => state = DemandState.loaded(demand),
       );
     } catch (e) {
-      state = DemandState.error('Failed to load demand: $e');
+      if (state.demand != null) {
+        state = state.copyWith(isRefreshing: false);
+      } else {
+        state = const DemandState.error('Could not load demand data. Please try again.');
+      }
     }
   }
 
-  Future<void> refresh() async {
-    await loadDemand();
-  }
+  Future<void> refresh() async => loadDemand();
 
   void disposeSSE() {
     _sseClient?.dispose();
@@ -187,13 +219,17 @@ class DemandViewmodel extends _$DemandViewmodel {
 
 class DemandState {
   final bool isLoading;
+  final bool isRefreshing;
   final DemandData? demand;
   final String? error;
+  final String? lastError; // non-fatal error during silent refresh
 
   const DemandState._({
     required this.isLoading,
+    this.isRefreshing = false,
     this.demand,
     this.error,
+    this.lastError,
   });
 
   const DemandState.initial()
@@ -210,13 +246,17 @@ class DemandState {
 
   DemandState copyWith({
     bool? isLoading,
+    bool? isRefreshing,
     DemandData? demand,
     String? error,
+    String? lastError,
   }) {
     return DemandState._(
       isLoading: isLoading ?? this.isLoading,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       demand: demand ?? this.demand,
       error: error ?? this.error,
+      lastError: lastError ?? this.lastError,
     );
   }
 }

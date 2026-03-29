@@ -15,7 +15,7 @@ VehicleRepository vehicleRepository(VehicleRepositoryRef ref) {
 }
 
 class VehicleRepository {
-  final String baseUrl = ServerConstants.baseUrl;
+  final String baseUrl = ServerConstants.authServiceUrl;
   late final Dio _dio;
 
   VehicleRepository(this._dio);
@@ -30,7 +30,7 @@ class VehicleRepository {
       FormData formData = FormData.fromMap(data);
       if (photoPath != null) {
         formData.files.add(MapEntry(
-          'file',
+          'photo',
           await MultipartFile.fromFile(photoPath,
               filename: 'vehicle_photo.jpg'),
         ));
@@ -50,9 +50,9 @@ class VehicleRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Network error: ${e.message}"));
+      return Left(AppFailure("Could not connect to the server. Please check your internet and try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -74,9 +74,9 @@ class VehicleRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Network error: ${e.message}"));
+      return Left(AppFailure("Could not connect to the server. Please check your internet and try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -99,9 +99,9 @@ class VehicleRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Network error: ${e.message}"));
+      return Left(AppFailure("Could not connect to the server. Please check your internet and try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -116,7 +116,7 @@ class VehicleRepository {
       FormData formData = FormData.fromMap(data);
       if (photoPath != null) {
         formData.files.add(MapEntry(
-          'file',
+          'photo',
           await MultipartFile.fromFile(photoPath,
               filename: 'vehicle_photo.jpg'),
         ));
@@ -136,9 +136,9 @@ class VehicleRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Network error: ${e.message}"));
+      return Left(AppFailure("Could not connect to the server. Please check your internet and try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -161,9 +161,9 @@ class VehicleRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Network error: ${e.message}"));
+      return Left(AppFailure("Could not connect to the server. Please check your internet and try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 }

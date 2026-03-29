@@ -1,27 +1,27 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'current_driver_notifier.dart';
+part of 'current_user_notifier.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentDriverNotifierHash() =>
-    r'dd61025f3c12df9bcfc1e180d4366e6fdb336d4e';
+String _$currentUserNotifierHash() =>
+    r'0af8be39feb688c4c0c6a0e1fff07b2e5104b2d9';
 
-/// See also [CurrentDriverNotifier].
-@ProviderFor(CurrentDriverNotifier)
-final currentDriverNotifierProvider =
-    NotifierProvider<CurrentDriverNotifier, DriverModel?>.internal(
-  CurrentDriverNotifier.new,
-  name: r'currentDriverNotifierProvider',
+/// See also [CurrentUserNotifier].
+@ProviderFor(CurrentUserNotifier)
+final currentUserNotifierProvider =
+    NotifierProvider<CurrentUserNotifier, UserModel?>.internal(
+  CurrentUserNotifier.new,
+  name: r'currentUserNotifierProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$currentDriverNotifierHash,
+      : _$currentUserNotifierHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$CurrentDriverNotifier = Notifier<DriverModel?>;
+typedef _$CurrentUserNotifier = Notifier<UserModel?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

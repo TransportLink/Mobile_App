@@ -40,12 +40,16 @@ class VehicleWidgets {
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: vehicle.photoUrl == null
+                    child: (vehicle.photoUrl == null || vehicle.photoUrl!.isEmpty)
                         ? Icon(VehicleUtils.getVehicleIcon(vehicle.vehicleType),
                             color: Colors.black54)
                         : Image.network(
                             vehicle.photoUrl!,
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              VehicleUtils.getVehicleIcon(vehicle.vehicleType),
+                              color: Colors.black54,
+                            ),
                           ),
                   ),
                 ),
@@ -196,40 +200,42 @@ class VehicleWidgets {
   /// Build empty state
   static Widget buildEmptyState(VoidCallback onAddVehicle) {
     return Center(
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.directions_car_outlined,
-              size: 48,
+              size: 40,
               color: Colors.grey[400],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           const Text(
             'No vehicles added yet',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w600,
               color: Colors.black,
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Add your first vehicle to start managing your fleet',
+            'Add your vehicle to start accepting trips',
             style: TextStyle(
               fontSize: 14,
               color: Colors.black54,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: onAddVehicle,
             style: ElevatedButton.styleFrom(
@@ -257,6 +263,7 @@ class VehicleWidgets {
             ),
           ),
         ],
+      ),
       ),
     );
   }

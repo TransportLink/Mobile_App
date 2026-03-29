@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:mobileapp/core/model/driver_document.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
 import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 import 'package:mobileapp/features/driver/repository/driver_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -11,10 +11,10 @@ part 'driver_view_model.g.dart';
 
 @riverpod
 Future<List<DriverDocument>> getAllDocuments(GetAllDocumentsRef ref) async {
-  final currentDriver = ref.watch(currentDriverNotifierProvider);
+  final currentDriver = ref.watch(currentUserNotifierProvider);
 
   if (currentDriver == null) {
-    throw 'No current driver found';
+    throw 'Please log in to continue.';
   }
 
   final res = await ref.watch(driverRepositoryProvider).listDocuments();
@@ -47,7 +47,7 @@ class DriverViewModel extends _$DriverViewModel {
 
     final accessToken = _authLocalRepository.getToken('access_token');
     if (accessToken == null) {
-      state = AsyncValue.error('Access token not found', StackTrace.current);
+      state = AsyncValue.error('Your session has expired. Please log in again.', StackTrace.current);
       return;
     }
 

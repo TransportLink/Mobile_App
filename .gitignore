@@ -48,3 +48,8 @@ android/
 
 
 .env
+# Test logs
+
+# Test logs
+tests/logs/
+integration_test/screenshots/

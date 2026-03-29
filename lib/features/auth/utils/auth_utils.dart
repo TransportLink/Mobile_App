@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
 import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 import 'package:mobileapp/features/home/view/pages/auth_page.dart';
 
@@ -31,9 +32,14 @@ Future logOut(WidgetRef ref, BuildContext context) async {
       });
 
   if (isLogout == true && context.mounted) {
+    // Clear tokens
     ref.read(authLocalRepositoryProvider)
       ..removeToken('access_token')
       ..removeToken('refresh_token');
+
+    // Clear user state (triggers MyApp rebuild → shows AuthPage)
+    ref.read(currentUserNotifierProvider.notifier).clearCurrentUser();
+    // Keep role in SharedPreferences — it persists across logout/login
 
     Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const AuthPage()));

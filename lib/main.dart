@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
+import 'package:mobileapp/core/providers/user_role_provider.dart';
 import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:mobileapp/features/home/view/pages/auth_page.dart';
-import 'package:mobileapp/features/home/view/pages/home_page.dart';
+import 'package:mobileapp/main_screen.dart';
+import 'package:mobileapp/passenger/view/passenger_home_page.dart';
 
 import 'package:mobileapp/core/services/notification_service.dart';
 
@@ -32,12 +34,23 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUser = ref.watch(currentDriverNotifierProvider);
+    final currentUser = ref.watch(currentUserNotifierProvider);
+
+    final role = ref.watch(userRoleProvider);
+
+    Widget home;
+    if (currentUser == null) {
+      home = const AuthPage();
+    } else if (role == UserRole.passenger) {
+      home = const PassengerHomePage();
+    } else {
+      home = const MainScreen(); // driver + unknown defaults to driver (4-tab nav)
+    }
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: CustomTheme.lightThemeMode,
-      home: currentUser == null ? const AuthPage() : HomePage(),
+      home: home,
     );
   }
 }

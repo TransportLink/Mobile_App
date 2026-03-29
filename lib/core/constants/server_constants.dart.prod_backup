@@ -1,0 +1,5 @@
+class ServerConstants {
+  static const String authServiceUrl = 'https://trotro-hailing-authentication-servi.vercel.app';
+  static const String mapServiceUrl = 'https://smart-trotro-map-microservice.vercel.app/';
+  static const String webServerUrl = 'https://trotro-hailing-web-server.vercel.app';
+}

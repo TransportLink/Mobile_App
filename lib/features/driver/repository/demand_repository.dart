@@ -19,7 +19,7 @@ DemandRepository demandRepository(DemandRepositoryRef ref) {
 /// Task 2.5: Demand List View for drivers
 class DemandRepository {
   final Dio _dio;
-  final String _baseUrl = ServerConstants.microserviceUrl;
+  final String _baseUrl = ServerConstants.mapServiceUrl;
 
   DemandRepository(this._dio);
 
@@ -32,8 +32,12 @@ class DemandRepository {
     double radius = 10.0,
   }) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/demand/broadcast',
+      // _baseUrl already ends with '/', so don't add another slash
+      final response = await Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      )).get(
+        '${_baseUrl}demand/broadcast',
         queryParameters: {
           'lat': latitude,
           'lon': longitude,
@@ -46,13 +50,13 @@ class DemandRepository {
         return Right(DemandData.fromMap(data));
       } else {
         return Left(AppFailure(
-          'Failed to load demand data: ${response.statusCode}',
+          'Could not load passenger demand. Please try again.',
         ));
       }
     } on DioException catch (e) {
       return Left(AppFailure(_handleDioError(e)));
     } catch (e) {
-      return Left(AppFailure('Unexpected error: $e'));
+      return Left(AppFailure('Something went wrong. Please try again.'));
     }
   }
 
@@ -66,7 +70,7 @@ class DemandRepository {
   }) async {
     try {
       final response = await _dio.get(
-        '$_baseUrl/demand/top-opportunities',
+        '${_baseUrl}demand/top-opportunities',
         queryParameters: {
           'lat': latitude,
           'lon': longitude,
@@ -79,31 +83,31 @@ class DemandRepository {
         return Right(TopOpportunities.fromMap(data));
       } else {
         return Left(AppFailure(
-          'Failed to load opportunities: ${response.statusCode}',
+          'Could not load nearby opportunities. Please try again.',
         ));
       }
     } on DioException catch (e) {
       return Left(AppFailure(_handleDioError(e)));
     } catch (e) {
-      return Left(AppFailure('Unexpected error: $e'));
+      return Left(AppFailure('Something went wrong. Please try again.'));
     }
   }
 
   String _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout) {
-      return 'Connection timeout. Please check your internet.';
+      return 'Connection is slow. Please check your internet and try again.';
     } else if (e.type == DioExceptionType.receiveTimeout) {
-      return 'Response timeout. Please try again.';
+      return 'Server is taking too long. Please try again.';
     } else if (e.type == DioExceptionType.badResponse) {
       final data = e.response?.data;
       if (data is Map<String, dynamic>) {
         return data['message'] ?? data['error'] ?? 'Request failed';
       }
-      return 'Request failed with status ${e.response?.statusCode}';
+      return 'Request failed. Please try again.';
     } else if (e.type == DioExceptionType.connectionError) {
       return 'Cannot connect to server. Please try again later.';
     }
-    return 'Network error. Please try again.';
+    return 'Could not connect. Please check your internet and try again.';
   }
 }
 

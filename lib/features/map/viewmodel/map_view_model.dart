@@ -1,28 +1,37 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:geolocator/geolocator.dart' as geo;
+import 'package:mobileapp/core/constants/server_constants.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/destination.dart';
 import 'package:mobileapp/core/model/route.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
 import 'package:mobileapp/core/services/notification_service.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
+import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 import 'package:mobileapp/features/map/repository/map_repository.dart';
 import 'package:mobileapp/features/map/repository/driver_location_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as flutter_riverpod;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 
 part 'map_view_model.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class MapViewModel extends _$MapViewModel {
   late MapRepository _mapRepository;
   late DriverLocationRepository _driverLocationRepository;
 
   Timer? _locationUpdateTimer;
   Timer? _busStopUpdateTimer;
-  Timer? _routeUpdateTimer;
+  Timer? _routeUpdateTimer;        // Fast polyline + ETA recalc (15s)
+  Timer? _serverUpdateTimer;       // Slower server push (30s)
   bool _approachingNotified = false;
+  geo.Position? _lastDriverPosition; // Updated by location timer; used by bus stop fetches
+  geo.Position? _lastRoutePosition;  // Position when route was last recalculated
+  bool _fetchingBusStops = false;   // Prevents concurrent /map/systems requests
+  bool _recalculatingRoute = false; // Prevents overlapping OSRM calls
 
   @override
   AsyncValue<MapState>? build() {
@@ -32,29 +41,98 @@ class MapViewModel extends _$MapViewModel {
     return const AsyncValue.data(MapState());
   }
 
+  bool _initialized = false;
+  bool _initializing = false; // Guards against concurrent initializeMap() calls
+
   Future<void> initializeMap() async {
-    state = const AsyncValue.loading();
+    // Skip if already running or done — prevents parallel invocations racing through
+    if (_initialized || _initializing) return;
+    _initializing = true;
+
+    // Keep existing data state (never block map with loading overlay)
+    if (state?.hasValue != true) {
+      state = const AsyncValue.data(MapState());
+    }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final tripId = prefs.getInt('trip_id');
+      final currentDriver = ref.read(currentUserNotifierProvider);
+      final driverId = currentDriver?.driverId ?? currentDriver?.id ?? '';
 
+      // Grab last known position instantly (no GPS hardware wait)
+      final lastKnown = await geo.Geolocator.getLastKnownPosition();
+
+      // Fire immediate bus stop fetch in background using last known position.
+      // This means bus stops appear as soon as the network responds — no 30s wait.
+      if (lastKnown != null) {
+        fetchBusStops(
+          latitude: lastKnown.latitude,
+          longitude: lastKnown.longitude,
+        );
+      } else {
+        fetchBusStops(); // Will acquire GPS position itself
+      }
+
+      // Check Django for active trip (source of truth), fall back to local cache
+      final authLocal = ref.read(authLocalRepositoryProvider);
+      int? tripId;
+      String? busStopId;
+      List<Destination> tripDestinations = [];
+
+      if (driverId.isNotEmpty) {
+        Map<String, dynamic>? activeTrip;
+        try {
+          activeTrip = await _mapRepository.getDriverActiveTrip(driverId);
+        } catch (_) {
+          // Network failed — use cached trip data
+          activeTrip = null;
+        }
+
+        // Fall back to local cache if server unreachable
+        activeTrip ??= authLocal.getCachedActiveTrip();
+
+        if (activeTrip != null) {
+          tripId = activeTrip['trip_id'] as int?;
+          busStopId = activeTrip['system_id'] as String?;
+          final dests = activeTrip['destinations'] as List<dynamic>? ?? [];
+          tripDestinations = dests.map((d) => Destination(
+            destination: d['destination'] as String?,
+            passengerCount: d['passenger_count'] as int? ?? 0,
+          )).toList();
+
+          // Cache the trip data locally for future offline restores
+          authLocal.cacheActiveTrip(activeTrip);
+        } else {
+          // No active trip — clear any stale cache
+          authLocal.clearCachedActiveTrip();
+        }
+      }
+
+      final defaultVehicleId = authLocal.getDefaultVehicleId();
+
+      // Merge trip info into current state (bus stops may already be populated)
       final currentState = state?.value ?? const MapState();
-      final newState = currentState.copyWith(
+      state = AsyncValue.data(currentState.copyWith(
         tripId: tripId,
         isOnTrip: tripId != null,
-      );
-
-      state = AsyncValue.data(newState);
+        currentBusStopId: busStopId,
+        selectedDestinations: tripDestinations.isNotEmpty ? tripDestinations : null,
+        selectedVehicleId: defaultVehicleId,
+      ));
 
       _startLocationUpdates();
       _startBusStopUpdates();
 
       if (tripId != null) {
         _startRouteUpdates();
+        // Calculate route immediately (don't wait for first 15s timer tick)
+        _recalculateRoute();
       }
+
+      _initialized = true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    } finally {
+      _initializing = false;
     }
   }
 
@@ -63,20 +141,38 @@ class MapViewModel extends _$MapViewModel {
     double? longitude,
     double? radius,
   }) async {
+    // Drop duplicate calls — prevents 3 concurrent /map/systems requests after cancel
+    if (_fetchingBusStops) return;
+    _fetchingBusStops = true;
+
     const maxRetries = 3;
     var retryCount = 0;
 
+    try {
     while (retryCount < maxRetries) {
       try {
         final currentState = state?.value ?? const MapState();
 
-        geo.Position? position;
         if (latitude == null || longitude == null) {
-          position = await geo.Geolocator.getCurrentPosition(
-            desiredAccuracy: geo.LocationAccuracy.high,
-          );
-          latitude = position.latitude;
-          longitude = position.longitude;
+          // Prefer the position already tracked by the location timer (most
+          // accurate + no extra GPS wake), then fall back to last-known, then
+          // force a fresh fix only as a last resort.
+          if (_lastDriverPosition != null) {
+            latitude = _lastDriverPosition!.latitude;
+            longitude = _lastDriverPosition!.longitude;
+          } else {
+            final lastKnown = await geo.Geolocator.getLastKnownPosition();
+            if (lastKnown != null) {
+              latitude = lastKnown.latitude;
+              longitude = lastKnown.longitude;
+            } else {
+              final position = await geo.Geolocator.getCurrentPosition(
+                desiredAccuracy: geo.LocationAccuracy.medium,
+              );
+              latitude = position.latitude;
+              longitude = position.longitude;
+            }
+          }
         }
 
         final searchRadius = radius ?? currentState.searchRadius;
@@ -98,11 +194,21 @@ class MapViewModel extends _$MapViewModel {
             state = AsyncValue.error(error.message, StackTrace.current);
             return;
           case Right(value: final busStops):
-            final newState = currentState.copyWith(
-              busStops: busStops,
-              searchRadius: searchRadius,
-            );
-            state = AsyncValue.data(newState);
+            // Only rebuild the widget tree if stops actually changed —
+            // unnecessary rebuilds cancel in-flight OSM tile downloads.
+            final unchanged = busStops.length == currentState.busStops.length &&
+                busStops.asMap().entries.every((e) {
+                  final old = currentState.busStops[e.key];
+                  return e.value.systemId == old.systemId &&
+                      e.value.totalCount == old.totalCount;
+                });
+            if (!unchanged) {
+              final newState = currentState.copyWith(
+                busStops: busStops,
+                searchRadius: searchRadius,
+              );
+              state = AsyncValue.data(newState);
+            }
             return;
         }
       } catch (e, st) {
@@ -117,8 +223,11 @@ class MapViewModel extends _$MapViewModel {
       }
     }
     state = AsyncValue.error(
-        'Failed to fetch bus stops after $maxRetries retries',
+        'Could not load bus stops. Please check your internet and try again.',
         StackTrace.current);
+    } finally {
+      _fetchingBusStops = false;
+    }
   }
 
   Future<void> acceptTrip({
@@ -127,9 +236,9 @@ class MapViewModel extends _$MapViewModel {
     required String vehicleId,
   }) async {
     try {
-      final currentDriver = ref.read(currentDriverNotifierProvider);
+      final currentDriver = ref.read(currentUserNotifierProvider);
       if (currentDriver?.driverId == null) {
-        state = AsyncValue.error('Driver ID not found', StackTrace.current);
+        state = AsyncValue.error('Please log in to continue.', StackTrace.current);
         return;
       }
 
@@ -152,6 +261,8 @@ class MapViewModel extends _$MapViewModel {
         busStopLng: busStop.longitude,
         destinations: destinationsData,
         vehicleId: vehicleId,
+        driverLat: position.latitude,
+        driverLng: position.longitude,
       );
 
       switch (result) {
@@ -161,9 +272,6 @@ class MapViewModel extends _$MapViewModel {
         case Right(value: final routeData):
           final route = Route.fromJson(routeData['route']);
           final tripId = routeData['trip_id'] as int;
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('trip_id', tripId);
 
           final currentState = state?.value ?? const MapState();
           final newState = currentState.copyWith(
@@ -177,18 +285,33 @@ class MapViewModel extends _$MapViewModel {
 
           state = AsyncValue.data(newState);
 
-          // Show trip confirmed notification
-          final totalPassengers =
-              destinations.fold(0, (sum, d) => sum + d.passengerCount);
-          NotificationService().showTripConfirmed(
-            tripId: tripId,
-            stopName: busStop.systemId,
-            etaMinutes: route.eta / 60,
-            passengerCount: totalPassengers,
-            destination: destinations.isNotEmpty
-                ? (destinations.first.destination ?? '')
-                : '',
-          );
+          // Cache trip locally for offline restoration
+          final authLocal = ref.read(authLocalRepositoryProvider);
+          authLocal.cacheActiveTrip({
+            'trip_id': tripId,
+            'system_id': busStop.systemId,
+            'destinations': destinations.map((d) => {
+              'destination': d.destination,
+              'passenger_count': d.passengerCount,
+            }).toList(),
+          });
+
+          // Show trip confirmed notification (non-critical — don't block trip on failure)
+          try {
+            final totalPassengers =
+                destinations.fold(0, (sum, d) => sum + d.passengerCount);
+            NotificationService().showTripConfirmed(
+              tripId: tripId,
+              stopName: busStop.systemId,
+              etaMinutes: route.eta,
+              passengerCount: totalPassengers,
+              destination: destinations.isNotEmpty
+                  ? (destinations.first.destination ?? '')
+                  : '',
+            );
+          } catch (_) {
+            // Notification failure should never prevent trip acceptance
+          }
 
           _startRouteUpdates();
           break;
@@ -199,64 +322,85 @@ class MapViewModel extends _$MapViewModel {
   }
 
   Future<void> cancelTrip() async {
-    try {
-      final currentState = state?.value;
-      if (currentState == null ||
-          !currentState.isOnTrip ||
-          currentState.tripId == null ||
-          currentState.currentBusStopId == null ||
-          currentState.selectedVehicleId == null ||
-          currentState.selectedDestinations.isEmpty) {
-        await _clearTripState();
-        return;
+    final currentState = state?.value;
+    final currentDriver = ref.read(currentUserNotifierProvider);
+    final driverId = currentDriver?.driverId ?? currentDriver?.id ?? '';
+    final tripId = currentState?.tripId;
+
+    // Step 1: Cancel on Django (source of truth)
+    // Django handles everything: deactivate trip → release passengers →
+    // broadcast demand update → notify Edge System for announcement
+    if (driverId.isNotEmpty) {
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        try {
+          final response = await dio.post(
+            '${ServerConstants.webServerUrl}/api/cancel_trip/',
+            data: {
+              'trip_id': tripId ?? 0,
+              'driver_id': driverId,
+            },
+            options: Options(headers: {
+              'X-API-KEY': ServerConstants.mapApiKey,
+              'Content-Type': 'application/json',
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            print('Trip cancelled on server: ${response.data}');
+            break;
+          }
+        } catch (e) {
+          print('Cancel attempt $attempt/3 failed: $e');
+          if (attempt < 3) await Future.delayed(const Duration(seconds: 2));
+        }
       }
-
-      final currentDriver = ref.read(currentDriverNotifierProvider);
-      if (currentDriver?.driverId == null) {
-        state = AsyncValue.error('Driver ID not found', StackTrace.current);
-        return;
-      }
-
-      final firstDestination = currentState.selectedDestinations.first;
-      final busStop = currentState.busStops.firstWhere(
-        (stop) => stop.systemId == currentState.currentBusStopId,
-      );
-
-      final result = await _mapRepository.cancelRoute(
-        driverId: currentDriver!.driverId!,
-        systemId: currentState.currentBusStopId!,
-        vehicleId: currentState.selectedVehicleId!,
-        destination: firstDestination.destination ?? '',
-        destLat: busStop.latitude,
-        destLng: busStop.longitude,
-        passengerCount: firstDestination.passengerCount,
-        tripId: currentState.tripId!,
-      );
-
-      switch (result) {
-        case Left(value: final error):
-          state = AsyncValue.error(error.message, StackTrace.current);
-          break;
-        case Right(value: final _):
-          await _clearTripState();
-          break;
-      }
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
     }
+
+    // Step 2: Clear local state (always, regardless of server response)
+    await _clearTripState();
   }
 
   Future<void> arrivedAtDestination() async {
     final currentState = state?.value;
-    if (currentState != null && currentState.selectedDestinations.isNotEmpty) {
-      final firstDest = currentState.selectedDestinations.first;
-      if (firstDest.destination != null) {
-        await _driverLocationRepository.updateDestination(
-          firstDest.destination!,
-          'available',
+    final currentDriver = ref.read(currentUserNotifierProvider);
+    final driverId = currentDriver?.driverId ?? currentDriver?.id ?? '';
+    final tripId = currentState?.tripId;
+
+    // Tell Django the trip is complete
+    // Django handles: deactivate trip → calculate earnings → release passengers →
+    // broadcast demand update → notify Edge System
+    if (tripId != null && driverId.isNotEmpty) {
+      try {
+        final dio = Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ));
+        await dio.post(
+          '${ServerConstants.webServerUrl}/complete_trip/',
+          data: {
+            'trip_id': tripId,
+            'system_id': currentState?.currentBusStopId ?? '',
+            'driver_id': driverId,
+          },
+          options: Options(headers: {
+            'X-API-KEY': ServerConstants.mapApiKey,
+            'Content-Type': 'application/json',
+          }),
         );
+        print('Trip $tripId completed on server');
+      } catch (e) {
+        print('Complete trip failed, falling back to cancel: $e');
+        // Fallback: at minimum, cancel the trip so passengers are released
+        await cancelTrip();
+        return;
       }
     }
+
     await _clearTripState();
   }
 
@@ -274,38 +418,53 @@ class MapViewModel extends _$MapViewModel {
     state = AsyncValue.data(newState);
   }
 
+  String _lastGeocodedAddress = 'Unknown';
+  double _lastGeocodedLat = 0;
+  double _lastGeocodedLng = 0;
+
   void _startLocationUpdates() {
     _locationUpdateTimer?.cancel();
     _locationUpdateTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 30), // Every 30s, not 10s — reduces network load
       (timer) async {
         try {
           final position = await geo.Geolocator.getCurrentPosition(
-            desiredAccuracy: geo.LocationAccuracy.high,
+            desiredAccuracy: geo.LocationAccuracy.medium,
           );
 
-          // Reverse geocode current position
-          final addressResult = await _mapRepository.fetchReverseGeocoding(
-            latitude: position.latitude,
-            longitude: position.longitude,
+          // Keep a fresh position so fetchBusStops() doesn't use stale cache
+          _lastDriverPosition = position;
+
+          // Only reverse geocode if moved >100m (avoid spamming Nominatim)
+          final distance = geo.Geolocator.distanceBetween(
+            _lastGeocodedLat, _lastGeocodedLng,
+            position.latitude, position.longitude,
           );
-          String address = 'Unknown';
-          switch (addressResult) {
-            case Right(value: final data):
-              address = data['place_name']?.toString() ?? 'Unknown';
-              break;
-            case Left():
-              break;
+
+          if (distance > 100 || _lastGeocodedAddress == 'Unknown') {
+            final addressResult = await _mapRepository.fetchReverseGeocoding(
+              latitude: position.latitude,
+              longitude: position.longitude,
+            );
+            switch (addressResult) {
+              case Right(value: final data):
+                _lastGeocodedAddress = data['place_name']?.toString() ?? 'Unknown';
+                _lastGeocodedLat = position.latitude;
+                _lastGeocodedLng = position.longitude;
+                break;
+              case Left():
+                break;
+            }
           }
 
           // Update driver location on the auth service
           await _driverLocationRepository.updateDriverLocation(
             latitude: position.latitude,
             longitude: position.longitude,
-            address: address,
+            address: _lastGeocodedAddress,
           );
         } catch (e) {
-          print('Error updating driver location: $e');
+          // Non-critical — app works without location updates
         }
       },
     );
@@ -328,26 +487,150 @@ class MapViewModel extends _$MapViewModel {
 
   void _startRouteUpdates() {
     _routeUpdateTimer?.cancel();
+    _serverUpdateTimer?.cancel();
+
+    // Fast polyline + ETA recalculation every 15 seconds
+    // Only hits OSRM if driver moved >50m since last recalc
     _routeUpdateTimer = Timer.periodic(
-      const Duration(minutes: 5),
+      const Duration(seconds: 15),
       (timer) async {
         try {
-          await _updateLocationOnRoute();
+          await _recalculateRoute();
         } catch (e) {
-          print('Error in route update: $e');
+          print('Error in route recalculation: $e');
+        }
+      },
+    );
+
+    // Server location push every 30 seconds (notifies Django + Edge System)
+    _serverUpdateTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (timer) async {
+        try {
+          await _pushLocationToServer();
+        } catch (e) {
+          print('Error in server location push: $e');
         }
       },
     );
   }
 
-  Future<void> _updateLocationOnRoute() async {
+  /// Recalculate route polyline + ETA from OSRM (runs every 15s, skips if not moved)
+  Future<void> _recalculateRoute() async {
     final currentState = state?.value;
     if (currentState == null || !currentState.isOnTrip) {
       _routeUpdateTimer?.cancel();
+      _serverUpdateTimer?.cancel();
       return;
     }
 
-    final currentDriver = ref.read(currentDriverNotifierProvider);
+    if (_recalculatingRoute) return; // Previous OSRM call still in-flight
+    _recalculatingRoute = true;
+
+    try {
+      final position = await geo.Geolocator.getCurrentPosition(
+        desiredAccuracy: geo.LocationAccuracy.high,
+      );
+      _lastDriverPosition = position;
+
+      // Skip OSRM call if driver hasn't moved >50m since last recalc
+      if (_lastRoutePosition != null) {
+        final moved = geo.Geolocator.distanceBetween(
+          _lastRoutePosition!.latitude, _lastRoutePosition!.longitude,
+          position.latitude, position.longitude,
+        );
+        if (moved < 50) return; // Hasn't moved enough — skip
+      }
+
+      final busStop = currentState.busStops.cast<BusStop?>().firstWhere(
+        (stop) => stop?.systemId == currentState.currentBusStopId,
+        orElse: () => null,
+      );
+      if (busStop == null) return;
+
+      // Calculate live distance
+      final distanceToBusStop = geo.Geolocator.distanceBetween(
+        position.latitude, position.longitude,
+        busStop.latitude, busStop.longitude,
+      );
+      final distanceKm = distanceToBusStop / 1000;
+
+      // Approaching notification
+      if (distanceToBusStop < 500 && !_approachingNotified) {
+        _approachingNotified = true;
+        try {
+          final totalPassengers = currentState.selectedDestinations
+              .fold(0, (sum, d) => sum + d.passengerCount);
+          NotificationService().showApproachingBusStop(
+            stopName: currentState.currentBusStopId ?? '',
+            passengerCount: totalPassengers,
+            destination: currentState.selectedDestinations.isNotEmpty
+                ? (currentState.selectedDestinations.first.destination ?? '')
+                : '',
+          );
+        } catch (_) {
+          // Non-critical — don't crash route update on notification failure
+        }
+      }
+
+      // Fetch live route from OSRM (polyline + ETA)
+      double etaMinutes;
+      List<List<double>>? liveCoordinates;
+      try {
+        final osrmResponse = await Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+        )).get(
+          'https://router.project-osrm.org/route/v1/driving/'
+          '${position.longitude},${position.latitude};'
+          '${busStop.longitude},${busStop.latitude}',
+          queryParameters: {
+            'overview': 'full',
+            'geometries': 'geojson',
+          },
+        );
+        if (osrmResponse.statusCode == 200 &&
+            osrmResponse.data['routes'] != null &&
+            (osrmResponse.data['routes'] as List).isNotEmpty) {
+          final osrmRoute = osrmResponse.data['routes'][0];
+          final durationSeconds = osrmRoute['duration']?.toDouble() ?? 0.0;
+          etaMinutes = durationSeconds / 60.0;
+          final geometry = osrmRoute['geometry'];
+          if (geometry != null && geometry['coordinates'] != null) {
+            liveCoordinates = (geometry['coordinates'] as List)
+                .map((c) => List<double>.from(c))
+                .toList();
+          }
+        } else {
+          etaMinutes = (distanceKm / 15) * 60;
+        }
+      } catch (_) {
+        etaMinutes = (distanceKm / 15) * 60;
+      }
+
+      _lastRoutePosition = position;
+
+      // Update UI with live route
+      if (currentState.currentRoute != null) {
+        final liveRoute = Route(
+          coordinates: liveCoordinates ?? currentState.currentRoute!.coordinates,
+          destination: currentState.currentRoute!.destination,
+          distance: distanceKm,
+          eta: etaMinutes,
+        );
+        state = AsyncValue.data(currentState.copyWith(currentRoute: liveRoute));
+      }
+    } finally {
+      _recalculatingRoute = false;
+    }
+  }
+
+  /// Push driver location + ETA to server (runs every 30s, notifies Django + Edge System)
+  Future<void> _pushLocationToServer() async {
+    final currentState = state?.value;
+    if (currentState == null || !currentState.isOnTrip) return;
+
+    final currentDriver = ref.read(currentUserNotifierProvider);
     if (currentDriver?.driverId == null ||
         currentState.tripId == null ||
         currentState.currentBusStopId == null ||
@@ -355,85 +638,50 @@ class MapViewModel extends _$MapViewModel {
       return;
     }
 
+    final busStop = currentState.busStops.cast<BusStop?>().firstWhere(
+      (stop) => stop?.systemId == currentState.currentBusStopId,
+      orElse: () => null,
+    );
+    if (busStop == null) return;
+
+    // Use the latest ETA from the route (already in minutes)
+    final etaMinutes = currentState.currentRoute?.eta;
+
     try {
-      final position = await geo.Geolocator.getCurrentPosition(
-        desiredAccuracy: geo.LocationAccuracy.high,
-      );
-
-      final busStop = currentState.busStops.firstWhere(
-        (stop) => stop.systemId == currentState.currentBusStopId,
-      );
-
-      // Check if approaching bus stop (within 500m)
-      final distanceToBusStop = geo.Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        busStop.latitude,
-        busStop.longitude,
-      );
-      if (distanceToBusStop < 500 && !_approachingNotified) {
-        _approachingNotified = true;
-        final totalPassengers = currentState.selectedDestinations
-            .fold(0, (sum, d) => sum + d.passengerCount);
-        NotificationService().showApproachingBusStop(
-          stopName: currentState.currentBusStopId ?? '',
-          passengerCount: totalPassengers,
-          destination: currentState.selectedDestinations.isNotEmpty
-              ? (currentState.selectedDestinations.first.destination ?? '')
-              : '',
-        );
-      }
-
-      // Calculate ETA to the bus stop using OSRM
-      final eta = await _mapRepository.calculateEta(
-        driverLat: position.latitude,
-        driverLng: position.longitude,
-        busStopLat: busStop.latitude,
-        busStopLng: busStop.longitude,
-      );
-
-      final result = await _mapRepository.updateLocation(
+      await _mapRepository.updateLocation(
         driverId: currentDriver!.driverId!,
         systemId: currentState.currentBusStopId!,
         vehicleId: currentState.selectedVehicleId!,
         tripId: currentState.tripId!,
         busStopLat: busStop.latitude,
         busStopLng: busStop.longitude,
-        eta: eta,
+        eta: etaMinutes,
       );
-
-      switch (result) {
-        case Left(value: final error):
-          print('Error updating location: ${error.message}');
-          break;
-        case Right(value: final data):
-          if (data['route'] != null) {
-            final updatedRoute = Route.fromJson(data['route']);
-            final newState = currentState.copyWith(currentRoute: updatedRoute);
-            state = AsyncValue.data(newState);
-          }
-          break;
-      }
     } catch (e) {
-      print('Error in location update: $e');
+      print('Error pushing location to server: $e');
     }
   }
 
   Future<void> _clearTripState() async {
     _routeUpdateTimer?.cancel();
     _routeUpdateTimer = null;
+    _serverUpdateTimer?.cancel();
+    _serverUpdateTimer = null;
     _approachingNotified = false;
+    _lastRoutePosition = null;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('trip_id');
+    // Clear cached trip so it won't restore after completion/cancellation
+    final authLocal = ref.read(authLocalRepositoryProvider);
+    authLocal.clearCachedActiveTrip();
 
     final currentState = state?.value ?? const MapState();
-    final newState = currentState.copyWith(
-      currentRoute: null,
-      selectedDestinations: [],
-      currentBusStopId: null,
-      tripId: null,
+    // Create fresh state — copyWith can't clear nullable fields
+    final newState = MapState(
+      busStops: currentState.busStops,
+      searchRadius: currentState.searchRadius,
+      selectedVehicleId: currentState.selectedVehicleId,
       isOnTrip: false,
+      // currentRoute, tripId, currentBusStopId, selectedDestinations = defaults (null/empty)
     );
 
     state = AsyncValue.data(newState);
@@ -443,6 +691,7 @@ class MapViewModel extends _$MapViewModel {
     _locationUpdateTimer?.cancel();
     _busStopUpdateTimer?.cancel();
     _routeUpdateTimer?.cancel();
+    _serverUpdateTimer?.cancel();
   }
 }
 
@@ -469,3 +718,14 @@ List<Destination> selectedDestinations(SelectedDestinationsRef ref) {
   final mapState = ref.watch(mapViewModelProvider);
   return mapState?.value?.selectedDestinations ?? [];
 }
+
+/// Focus request from Demand page → Map page.
+/// Set systemId to focus the map on that bus stop and auto-select it.
+class FocusBusStopRequest {
+  final String systemId;
+  final double latitude;
+  final double longitude;
+  FocusBusStopRequest({required this.systemId, required this.latitude, required this.longitude});
+}
+
+final pendingFocusBusStopProvider = flutter_riverpod.StateProvider<FocusBusStopRequest?>((ref) => null);

@@ -6,7 +6,7 @@ part of 'driver_view_model.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$getAllDocumentsHash() => r'cfeca18a0f9bff7e0f3fe4199d7f0dc474b10fc4';
+String _$getAllDocumentsHash() => r'33a4738fbfcd088e9a4aa03a38b8a7889af231f8';
 
 /// See also [getAllDocuments].
 @ProviderFor(getAllDocuments)
@@ -22,7 +22,7 @@ final getAllDocumentsProvider =
 );
 
 typedef GetAllDocumentsRef = AutoDisposeFutureProviderRef<List<DriverDocument>>;
-String _$driverViewModelHash() => r'44aca84439b6c5cccceffabb1a7375af8c24ef46';
+String _$driverViewModelHash() => r'841a5d154873793162227836f11682b74b74fc81';
 
 /// See also [DriverViewModel].
 @ProviderFor(DriverViewModel)

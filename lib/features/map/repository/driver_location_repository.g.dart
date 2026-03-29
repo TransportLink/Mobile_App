@@ -7,7 +7,7 @@ part of 'driver_location_repository.dart';
 // **************************************************************************
 
 String _$driverLocationRepositoryHash() =>
-    r'812cf1275a0d648c4408c4dd13155ebb5e8052fa';
+    r'18d9a5242f895000f1b068c8bbaa120b22e8ea31';
 
 /// See also [driverLocationRepository].
 @ProviderFor(driverLocationRepository)

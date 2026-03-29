@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -10,11 +11,13 @@ import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/destination.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
-import 'package:mobileapp/core/model/driver_model.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
+import 'package:mobileapp/core/model/user_model.dart';
+import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
 
 class MockMapRepository extends Mock implements MapRepository {}
 class MockDriverLocationRepository extends Mock implements DriverLocationRepository {}
+class MockAuthLocalRepository extends Mock implements AuthLocalRepository {}
 
 class _FakeGeolocator extends GeolocatorPlatform {
   @override
@@ -36,24 +39,34 @@ class _FakeGeolocator extends GeolocatorPlatform {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MockMapRepository mockMapRepo;
   late MockDriverLocationRepository mockDriverLocRepo;
+  late MockAuthLocalRepository mockAuthLocal;
 
   setUp(() {
     mockMapRepo = MockMapRepository();
     mockDriverLocRepo = MockDriverLocationRepository();
+    mockAuthLocal = MockAuthLocalRepository();
     GeolocatorPlatform.instance = _FakeGeolocator();
+
+    // Stub auth local repo methods used by map_view_model
+    when(() => mockAuthLocal.getDefaultVehicleId()).thenReturn(null);
+    when(() => mockAuthLocal.cacheActiveTrip(any())).thenAnswer((_) async {});
+    when(() => mockAuthLocal.clearCachedActiveTrip()).thenAnswer((_) async {});
+    when(() => mockAuthLocal.getCachedActiveTrip()).thenReturn(null);
   });
 
   test('acceptTrip happy path updates MapState', () async {
     final container = ProviderContainer(overrides: [
       mapRepositoryProvider.overrideWithValue(mockMapRepo),
       driverLocationRepositoryProvider.overrideWithValue(mockDriverLocRepo),
+      authLocalRepositoryProvider.overrideWithValue(mockAuthLocal),
     ]);
 
     // Add a fake current driver
-    container.read(currentDriverNotifierProvider.notifier).addCurrentDriver(
-          DriverModel(
+    container.read(currentUserNotifierProvider.notifier).addCurrentUser(
+          UserModel(
             id: 'driver-1',
             driverId: 'driver-1',
             full_name: 'Test Driver',
@@ -103,6 +116,8 @@ void main() {
           busStopLng: any(named: 'busStopLng'),
           destinations: any(named: 'destinations'),
           vehicleId: any(named: 'vehicleId'),
+          driverLat: any(named: 'driverLat'),
+          driverLng: any(named: 'driverLng'),
         )).thenAnswer((_) async => Right(fakeRouteJson));
 
     // Ensure the autoDispose provider is kept alive during the test
@@ -135,11 +150,12 @@ void main() {
     final container = ProviderContainer(overrides: [
       mapRepositoryProvider.overrideWithValue(mockMapRepo),
       driverLocationRepositoryProvider.overrideWithValue(mockDriverLocRepo),
+      authLocalRepositoryProvider.overrideWithValue(mockAuthLocal),
     ]);
 
     // Seed current driver
-    container.read(currentDriverNotifierProvider.notifier).addCurrentDriver(
-          DriverModel(
+    container.read(currentUserNotifierProvider.notifier).addCurrentUser(
+          UserModel(
             id: 'driver-1',
             driverId: 'driver-1',
             full_name: 'Test Driver',

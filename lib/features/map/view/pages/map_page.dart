@@ -7,8 +7,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:collection/collection.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/destination.dart';
-import 'package:mobileapp/core/model/vehicle_model.dart';
-import 'package:mobileapp/features/driver/viewmodel/vehicle_view_model.dart';
 import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
 import 'package:mobileapp/features/map/model/map_state.dart';
 import 'package:mobileapp/features/map/utils/helpers.dart';
@@ -69,20 +67,88 @@ class _MapScreenState extends ConsumerState<MapScreen>
     ));
   }
 
-  Future<void> _initializeMap() async {
-    await _requestLocationPermission();
-    await ref.read(mapViewModelProvider.notifier).initializeMap();
-    await _showUserLocation();
-    setState(() => _isLoading = false);
+  bool _listenerAdded = false;
 
-    // Listen for bus stop changes to update markers
-    ref.listenManual(mapViewModelProvider, (previous, next) {
-      final busStops = next?.value?.busStops ?? [];
-      if (busStops != _previousBusStops && busStops.isNotEmpty) {
-        _previousBusStops = busStops;
-        _updateMapMarkers(busStops);
-      }
-    });
+  Future<void> _initializeMap() async {
+    // Check if map data is already cached (coming back from another tab)
+    if (!mounted) return;
+    final existingState = ref.read(mapViewModelProvider)?.valueOrNull;
+    if (existingState != null && existingState.busStops.isNotEmpty) {
+      _updateMapMarkers(existingState.busStops);
+      await _showUserLocation();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    } else {
+      await _requestLocationPermission();
+      if (!mounted) return;
+      await _showUserLocation();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ref.read(mapViewModelProvider.notifier).initializeMap();
+    }
+
+    if (!mounted) return;
+    final currentState = ref.read(mapViewModelProvider)?.valueOrNull;
+    if (currentState?.isOnTrip == true && currentState?.currentRoute != null) {
+      await _showRouteOnMap(currentState!.currentRoute);
+      if (!mounted) return;
+      setState(() => _isTripCardMinimized = false);
+    }
+
+    if (!mounted) return;
+    if (!_listenerAdded) {
+      _listenerAdded = true;
+      ref.listenManual(mapViewModelProvider, (previous, next) {
+        final state = next?.valueOrNull;
+        final busStops = state?.busStops ?? [];
+        if (busStops != _previousBusStops && busStops.isNotEmpty) {
+          _previousBusStops = busStops;
+          _updateMapMarkers(busStops);
+        }
+        // Auto-show route line when route becomes available (e.g., after restoration)
+        if (state?.currentRoute != null &&
+            state!.currentRoute!.coordinates.isNotEmpty &&
+            _routePolylines.isEmpty &&
+            state.isOnTrip) {
+          _showRouteOnMap(state.currentRoute);
+        }
+        // Live-update polyline when route coordinates change (every 15s recalc)
+        if (state?.currentRoute != null &&
+            state!.isOnTrip &&
+            _routePolylines.isNotEmpty) {
+          final polyline = _mapUtils.buildRoutePolyline(state.currentRoute!);
+          if (polyline != null && mounted) {
+            setState(() => _routePolylines = [polyline]);
+          }
+        }
+        // Handle focus request from Demand page
+        final focusReq = ref.read(pendingFocusBusStopProvider);
+        if (focusReq != null && busStops.isNotEmpty) {
+          // Find matching bus stop and select it
+          final target = busStops.cast<BusStop?>().firstWhere(
+            (s) => s?.systemId == focusReq.systemId,
+            orElse: () => null,
+          );
+          if (target != null && mounted) {
+            // Clear the request
+            ref.read(pendingFocusBusStopProvider.notifier).state = null;
+            // Zoom to the bus stop
+            _mapController.move(LatLng(focusReq.latitude, focusReq.longitude), 16.0);
+            // Auto-select it (shows the bottom card)
+            setState(() {
+              _selectedBusStop = target;
+              _isTripCardMinimized = false;
+            });
+            _animationController?.forward();
+          }
+        }
+
+        // Clear polyline if trip ended
+        if (state?.isOnTrip == false && _routePolylines.isNotEmpty) {
+          if (mounted) setState(() => _routePolylines = []);
+        }
+      });
+    }
   }
 
   Future<void> _requestLocationPermission() async {
@@ -118,46 +184,67 @@ class _MapScreenState extends ConsumerState<MapScreen>
       }
     }
 
-    if (status.isGranted) {
-      await ref.read(mapViewModelProvider.notifier).fetchBusStops();
-    }
+    // Bus stop fetching is handled by initializeMap's timer — no extra call needed
   }
+
+  geo.Position? _lastKnownPosition;
+  double? _lastHeading;
 
   Future<void> _showUserLocation() async {
     try {
+      // Use last known position first for instant display, then refine
+      final lastKnown = await geo.Geolocator.getLastKnownPosition();
+      if (lastKnown != null && _lastKnownPosition == null) {
+        _lastKnownPosition = lastKnown;
+        final userLatLng = LatLng(lastKnown.latitude, lastKnown.longitude);
+        if (mounted) {
+          setState(() {
+            _currentCenter = userLatLng;
+            _userLocationMarker = _mapUtils.buildUserLocationMarker(lastKnown, heading: _lastHeading);
+          });
+          _mapController.move(userLatLng, 14.0);
+        }
+      }
+
+      // Then get accurate position with heading
       final position = await geo.Geolocator.getCurrentPosition(
         desiredAccuracy: geo.LocationAccuracy.high,
       );
+      _lastKnownPosition = position;
+      if (position.heading != 0) _lastHeading = position.heading;
       final userLatLng = LatLng(position.latitude, position.longitude);
-      setState(() {
-        _currentCenter = userLatLng;
-        _userLocationMarker = _mapUtils.buildUserLocationMarker(position);
-      });
-      _mapController.move(userLatLng, 14.0);
+      if (mounted) {
+        setState(() {
+          _currentCenter = userLatLng;
+          _userLocationMarker = _mapUtils.buildUserLocationMarker(position, heading: _lastHeading);
+        });
+        // Only auto-move if not on a trip (when on trip, camera follows route)
+        final isOnTrip = ref.read(mapViewModelProvider)?.valueOrNull?.isOnTrip ?? false;
+        if (!isOnTrip) {
+          _mapController.move(userLatLng, 14.0);
+        }
+      }
     } catch (e) {
-      print('Error showing user location: $e');
+      // Silently handle — location is non-critical for map display
     }
   }
 
   void _updateMapMarkers(List<BusStop> busStops) {
+    if (!mounted) return;
     final markers = _mapUtils.buildBusStopMarkers(busStops);
     setState(() {
       _busStopMarkers = markers;
     });
 
-    // Fit bounds
-    geo.Geolocator.getCurrentPosition(
-      desiredAccuracy: geo.LocationAccuracy.high,
-    ).then((position) {
-      final bounds = _mapUtils.calculateCameraBounds(position, busStops);
+    // Fit bounds using cached position (no extra GPS call)
+    if (_lastKnownPosition != null) {
+      final bounds = _mapUtils.calculateCameraBounds(_lastKnownPosition!, busStops);
       if (bounds != null) {
         _mapController.fitCamera(
           CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
         );
       }
-    }).catchError((e) {
-      print('Error fitting map bounds: $e');
-    });
+    }
   }
 
   Future<void> _showRouteOnMap(route_models.Route? route) async {
@@ -167,11 +254,35 @@ class _MapScreenState extends ConsumerState<MapScreen>
       setState(() {
         _routePolylines = [polyline];
       });
+
+      // Orient camera to show the full route from driver to bus stop
+      if (route.coordinates.isNotEmpty) {
+        // GeoJSON coordinates are [lng, lat]
+        final routePoints = route.coordinates
+            .map((c) => LatLng(c[1], c[0]))
+            .toList();
+
+        // Include driver position in the bounds
+        if (_lastKnownPosition != null) {
+          routePoints.add(LatLng(
+            _lastKnownPosition!.latitude,
+            _lastKnownPosition!.longitude,
+          ));
+        }
+
+        final bounds = LatLngBounds.fromPoints(routePoints);
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.fromLTRB(48, 100, 48, 280),
+          ),
+        );
+      }
     }
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng latLng) {
-    final mapState = ref.read(mapViewModelProvider)?.value;
+    final mapState = ref.read(mapViewModelProvider)?.valueOrNull;
     if (mapState == null) return;
 
     final tappedStop = mapState.busStops.firstWhereOrNull(
@@ -211,10 +322,16 @@ class _MapScreenState extends ConsumerState<MapScreen>
   }
 
   Future<void> _selectDestinationsAndAcceptTrip(BusStop stop) async {
-    final mapState = ref.read(mapViewModelProvider)?.value;
+    final mapState = ref.read(mapViewModelProvider)?.valueOrNull;
     if (mapState?.selectedVehicleId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle first')),
+        SnackBar(
+          content: const Text('Set a default vehicle first'),
+          action: SnackBarAction(
+            label: 'Vehicles',
+            onPressed: () => Navigator.pushNamed(context, '/vehicles'),
+          ),
+        ),
       );
       return;
     }
@@ -223,6 +340,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
       context: context,
       builder: (context) => DestinationSelectionDialog(
         availableDestinations: stop.destinations.keys.toList(),
+        passengerCounts: stop.destinations,
       ),
     );
 
@@ -233,57 +351,146 @@ class _MapScreenState extends ConsumerState<MapScreen>
       return;
     }
 
+    // Show loading overlay immediately
+    setState(() {
+      _selectedBusStop = null;
+      _isLoading = true;
+    });
+
     await ref.read(mapViewModelProvider.notifier).acceptTrip(
           busStop: stop,
           destinations: destinations,
           vehicleId: mapState!.selectedVehicleId!,
         );
 
-    // Show route on map if trip was accepted successfully
-    final updatedState = ref.read(mapViewModelProvider)?.value;
-    if (updatedState?.currentRoute != null) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    final updatedState = ref.read(mapViewModelProvider)?.valueOrNull;
+    if (updatedState?.isOnTrip == true && updatedState?.currentRoute != null) {
       await _showRouteOnMap(updatedState!.currentRoute);
+      setState(() => _isTripCardMinimized = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Trip #${updatedState.tripId} accepted! Head to the bus stop.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not accept trip. Please try again.'), backgroundColor: Colors.red),
+      );
     }
+  }
 
-    setState(() {
-      _selectedBusStop = null;
-      _isTripCardMinimized = false;
-    });
+  Future<void> _showCancelConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.warning_rounded, color: Colors.red.shade400, size: 40),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Cancel this trip?',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Passengers at the bus stop are expecting you. Frequent cancellations affect your reliability score.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Keep Trip'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade500,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Yes, Cancel'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
-    _animationController?.reset();
-    await _animationController?.forward();
+    if (confirmed == true) {
+      await _cancelTrip();
+    }
   }
 
   Future<void> _cancelTrip() async {
+    setState(() => _isLoading = true);
+
     await ref.read(mapViewModelProvider.notifier).cancelTrip();
+
+    if (!mounted) return;
     setState(() {
       _routePolylines = [];
       _isTripCardMinimized = false;
+      _isLoading = false;
     });
 
-    await _animationController?.reverse();
+    // Force refresh bus stop counts immediately
+    ref.read(mapViewModelProvider.notifier).fetchBusStops();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trip cancelled')),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Trip cancelled'), backgroundColor: Colors.orange),
+    );
   }
 
   Future<void> _arrivedAtDestination() async {
+    setState(() => _isLoading = true);
+
     await ref.read(mapViewModelProvider.notifier).arrivedAtDestination();
+
+    if (!mounted) return;
     setState(() {
       _routePolylines = [];
       _isTripCardMinimized = false;
+      _isLoading = false;
     });
 
-    await _animationController?.reverse();
+    // Force refresh bus stop counts immediately
+    ref.read(mapViewModelProvider.notifier).fetchBusStops();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Arrived at destination')),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Trip completed!'), backgroundColor: Colors.green),
+    );
   }
 
   void _onItemTapped(int index) {
@@ -308,7 +515,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
   @override
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapViewModelProvider);
-    final vehiclesAsync = ref.watch(getAllVehiclesProvider);
 
     final screenHeight = MediaQuery.of(context).size.height;
     final safePadding = MediaQuery.of(context).padding.bottom;
@@ -331,9 +537,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.airlectric.smarttrotro',
+                errorTileCallback: (tile, error, stackTrace) {},  // Suppress tile error spam
               ),
               MarkerLayer(markers: allMarkers),
               PolylineLayer(polylines: _routePolylines),
@@ -341,7 +547,43 @@ class _MapScreenState extends ConsumerState<MapScreen>
           ),
 
           if (_isLoading || mapState?.isLoading == true)
-            const Center(child: CircularProgressIndicator()),
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: Colors.green.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Please wait...',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           if (mapState?.hasError == true)
             Positioned(
@@ -353,169 +595,300 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Error: ${mapState!.error}',
+                    '${mapState?.error ?? "Something went wrong"}',
                     style: const TextStyle(color: Colors.red),
                   ),
                 ),
               ),
             ),
 
-          // Vehicle selector
-          if (vehiclesAsync.hasValue && vehiclesAsync.value!.isNotEmpty)
+          // No-vehicle warning — prompt driver to set a default on the Vehicles page
+          if (mapState?.valueOrNull?.selectedVehicleId == null)
             Positioned(
               top: 16,
               left: 16,
-              child: _buildVehicleSelector(vehiclesAsync.value!),
-            ),
-
-          // Search radius selector
-          if (mapState?.hasValue == true)
-            Positioned(
-              top: 16,
               right: 16,
-              child: _buildRadiusSelector(mapState!.value!.searchRadius),
+              child: GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/vehicles'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: 20, color: Colors.orange.shade700),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'No vehicle selected. Tap to set your default vehicle.',
+                          style: TextStyle(fontSize: 13, color: Colors.orange.shade800, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, size: 20, color: Colors.orange.shade400),
+                    ],
+                  ),
+                ),
+              ),
             ),
 
-          // Bottom sheet for bus stop/trip cards
-          if (_selectedBusStop != null || (mapState?.value?.isOnTrip ?? false))
+          // Bus stop selection card (full size)
+          if (_selectedBusStop != null && !(mapState?.valueOrNull?.isOnTrip ?? false))
             Positioned(
               bottom: safePadding + 56.0,
               left: 16.0,
               child: SlideTransition(
                 position: _slideAnimation!,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  width: _isTripCardMinimized
-                      ? 300.0
-                      : MediaQuery.of(context).size.width - 32.0,
-                  height: _isTripCardMinimized ? 80.0 : screenHeight * 0.5,
+                child: Container(
+                  width: MediaQuery.of(context).size.width - 32.0,
+                  height: screenHeight * 0.45,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withOpacity(0.15),
                         blurRadius: 10,
                         offset: const Offset(0, -2),
                       ),
                     ],
                   ),
-                  child: _buildBottomSheetContent(mapState?.value),
+                  child: _buildBottomSheetContent(mapState?.valueOrNull),
+                ),
+              ),
+            ),
+
+          // Trip card — minimized floating pill OR expanded card
+          if (mapState?.valueOrNull?.isOnTrip ?? false)
+            Positioned(
+              bottom: _isTripCardMinimized ? safePadding + 70.0 : safePadding + 56.0,
+              left: _isTripCardMinimized ? null : 16.0,
+              right: _isTripCardMinimized ? 16.0 : null,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _isTripCardMinimized = !_isTripCardMinimized);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  width: _isTripCardMinimized
+                      ? null
+                      : MediaQuery.of(context).size.width - 32.0,
+                  height: _isTripCardMinimized ? null : screenHeight * 0.45,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(_isTripCardMinimized ? 25 : 20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: _isTripCardMinimized ? 6 : 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: _isTripCardMinimized
+                      ? _buildMinimizedTripPill(mapState?.valueOrNull)
+                      : _buildBottomSheetContent(mapState?.valueOrNull),
                 ),
               ),
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Recenter',
-        onPressed: _showUserLocation,
-        child: const Icon(Icons.my_location),
+      floatingActionButton: FloatingActionButton.small(
+        heroTag: 'recenter',
+        tooltip: mapState?.valueOrNull?.isOnTrip == true ? 'Show route' : 'My location',
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 2,
+        onPressed: () {
+          // On trip: recenter on route. Not on trip: recenter on driver.
+          if (mapState?.valueOrNull?.isOnTrip == true && mapState?.valueOrNull?.currentRoute != null) {
+            _showRouteOnMap(mapState?.valueOrNull?.currentRoute);
+          } else {
+            _showUserLocation();
+          }
+        },
+        child: Icon(
+          mapState?.valueOrNull?.isOnTrip == true ? Icons.route : Icons.my_location,
+          size: 20,
+        ),
       ),
     );
   }
 
-  Widget _buildVehicleSelector(List<VehicleModel> vehicles) {
-    final mapState = ref.watch(mapViewModelProvider)?.value;
+  Widget _buildMinimizedTripPill(MapState? mapState) {
+    final currentRoute = mapState?.currentRoute;
+    final distance = currentRoute?.distance.toStringAsFixed(1) ?? '?';
+    final eta = currentRoute?.eta.toStringAsFixed(0) ?? '?';
+    final totalPax = mapState?.selectedDestinations.fold(0, (sum, d) => sum + d.passengerCount) ?? 0;
 
-    return Card(
-      child: DropdownButton<String>(
-        value: mapState?.selectedVehicleId,
-        hint: const Text('Select Vehicle'),
-        items: vehicles.map((vehicle) {
-          return DropdownMenuItem<String>(
-            value: vehicle.vehicleId,
-            child: Text('${vehicle.plateNumber} • ${vehicle.displayName}'),
-          );
-        }).toList(),
-        onChanged: (val) {
-          if (val != null) {
-            ref.read(mapViewModelProvider.notifier).updateSelectedVehicle(val);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildRadiusSelector(double currentRadius) {
-    final radii = [1.0, 3.0, 5.0, 10.0, 20.0];
-
-    return Card(
-      child: DropdownButton<double>(
-        value: currentRadius,
-        items: radii.map((r) {
-          return DropdownMenuItem<double>(
-            value: r,
-            child: Text('${r.toInt()} km'),
-          );
-        }).toList(),
-        onChanged: (val) {
-          if (val != null) {
-            ref.read(mapViewModelProvider.notifier).updateSearchRadius(val);
-          }
-        },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.green.shade600,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.directions_car, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '${distance}km',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            width: 4, height: 4,
+            decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle),
+          ),
+          Text(
+            '${eta} min',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            width: 4, height: 4,
+            decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle),
+          ),
+          Text(
+            '$totalPax pax',
+            style: TextStyle(fontSize: 14, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 6),
+          Icon(Icons.expand_less, size: 18, color: Colors.grey.shade500),
+        ],
       ),
     );
   }
 
   Widget _buildBottomSheetContent(MapState? mapStateValue) {
-    final mapState = ref.watch(mapViewModelProvider)?.value;
+    final mapState = ref.watch(mapViewModelProvider)?.valueOrNull;
 
     if (_selectedBusStop != null) {
       final stop = _selectedBusStop!;
+      final totalCount = stop.totalCount ?? 0;
+
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header with close button
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
-                    child: Text('Stop: ${stop.systemId}',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold))),
-                Text('${stop.totalCount} pax',
-                    style: const TextStyle(fontSize: 14)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.hail_rounded, color: Colors.green.shade700, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stop.systemId?.replaceAll('_', ' ') ?? 'Bus Stop',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '$totalCount passengers waiting',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedBusStop = null;
+                      _isTripCardMinimized = false;
+                    });
+                    _animationController?.reverse();
+                  },
+                  icon: const Icon(Icons.close, size: 20),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text('Destinations:',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            // Destination cards
             Expanded(
               child: ListView(
                 children: stop.destinations.entries.map((e) {
-                  return ListTile(
-                    dense: true,
-                    title: Text(e.key),
-                    trailing: Text('${e.value} pax'),
+                  final count = e.value;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: count > 0 ? Colors.green.shade50 : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: count > 0 ? Colors.green.shade200 : Colors.grey.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 18,
+                          color: count > 0 ? Colors.green.shade600 : Colors.grey.shade400,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            e.key,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: count > 0 ? Colors.black87 : Colors.grey.shade500,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: count > 0 ? Colors.green.shade600 : Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }).toList(),
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _selectDestinationsAndAcceptTrip(stop),
-                    child: const Text('Accept Trip'),
-                  ),
+            const SizedBox(height: 12),
+            // Accept button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: totalCount > 0 ? () => _selectDestinationsAndAcceptTrip(stop) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedBusStop = null;
-                        _isTripCardMinimized = false;
-                      });
-                      _animationController?.reverse();
-                    },
-                    child: const Text('Close'),
-                  ),
-                ),
-              ],
+                child: const Text('Accept Trip', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
             ),
           ],
         ),
@@ -525,59 +898,175 @@ class _MapScreenState extends ConsumerState<MapScreen>
     if (mapState?.isOnTrip ?? false) {
       final currentRoute = mapState?.currentRoute;
       final destinations = mapState?.selectedDestinations ?? [];
+      final totalPassengers = destinations.fold(0, (sum, d) => sum + d.passengerCount);
 
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Minimize handle
+            Center(
+              child: GestureDetector(
+                onTap: () => setState(() => _isTripCardMinimized = true),
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+            // Live distance/ETA banner
+            if (currentRoute != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade500, Colors.green.shade700],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    // Distance
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Icon(Icons.straighten, color: Colors.white70, size: 18),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${currentRoute.distance.toStringAsFixed(1)} km',
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const Text('distance', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    Container(width: 1, height: 40, color: Colors.white30),
+                    // ETA
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Icon(Icons.schedule, color: Colors.white70, size: 18),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${currentRoute.eta.toStringAsFixed(0)} min',
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const Text('arrival', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    Container(width: 1, height: 40, color: Colors.white30),
+                    // Passengers
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Icon(Icons.people, color: Colors.white70, size: 18),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$totalPassengers',
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const Text('passengers', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
+            // Trip info header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
-                    child: Text('On Trip: ${mapState?.tripId ?? ''}',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold))),
-                if (currentRoute != null)
-                  Text('${(currentRoute.distance).toStringAsFixed(1)} km',
-                      style: const TextStyle(fontSize: 14)),
+                Icon(Icons.location_on, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    currentRoute?.destination ?? mapState?.currentBusStopId?.replaceAll('_', ' ') ?? 'Bus Stop',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Trip #${mapState?.tripId ?? ''}',
+                    style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            if (currentRoute != null)
-              Text(
-                  'To: ${currentRoute.destination} — ETA ${(currentRoute.eta).toStringAsFixed(0)} mins'),
-            const SizedBox(height: 8),
-            const Text('Selected Destinations:',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            // Destinations
             Expanded(
               child: ListView.builder(
                 itemCount: destinations.length,
                 itemBuilder: (context, index) {
                   final d = destinations[index];
-                  return ListTile(
-                    title: Text(d.destination ?? 'Unknown'),
-                    trailing: Text('${d.passengerCount} pax'),
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.people, size: 16, color: Colors.green.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(d.destination ?? 'Unknown', style: const TextStyle(fontSize: 14)),
+                        ),
+                        Text(
+                          '${d.passengerCount} pax',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.green.shade700),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
             ),
+            const SizedBox(height: 10),
+            // Action buttons
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: _arrivedAtDestination,
-                    child: const Text('Arrived'),
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: SizedBox(
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _arrivedAtDestination,
+                      icon: const Icon(Icons.check_circle, size: 18),
+                      label: const Text('I\'ve Arrived', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
+                SizedBox(
+                  height: 46,
                   child: OutlinedButton(
-                    onPressed: _cancelTrip,
-                    child: const Text('Cancel Trip'),
+                    onPressed: () => _showCancelConfirmation(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      side: BorderSide(color: Colors.red.shade300),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(fontSize: 14)),
                   ),
                 ),
               ],
@@ -593,9 +1082,15 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
 class DestinationSelectionDialog extends StatefulWidget {
   final List<String> availableDestinations;
+  final Map<String, dynamic> passengerCounts;
 
-  const DestinationSelectionDialog(
-      {super.key, required this.availableDestinations});
+  static const int minPassengers = 5;
+
+  const DestinationSelectionDialog({
+    super.key,
+    required this.availableDestinations,
+    required this.passengerCounts,
+  });
 
   @override
   State<DestinationSelectionDialog> createState() =>
@@ -604,14 +1099,20 @@ class DestinationSelectionDialog extends StatefulWidget {
 
 class _DestinationSelectionDialogState
     extends State<DestinationSelectionDialog> {
-  final List<Destination> _selectedDestinations = [];
+  final Map<String, bool> _selected = {};
   final Map<String, TextEditingController> _passengerControllers = {};
 
   @override
   void initState() {
     super.initState();
     for (var dest in widget.availableDestinations) {
-      _passengerControllers[dest] = TextEditingController();
+      final available = (widget.passengerCounts[dest] ?? 0) as int;
+      _selected[dest] = false;
+      // Default to min of available or minPassengers
+      final defaultCount = available >= DestinationSelectionDialog.minPassengers
+          ? DestinationSelectionDialog.minPassengers
+          : available;
+      _passengerControllers[dest] = TextEditingController(text: '$defaultCount');
     }
   }
 
@@ -623,87 +1124,206 @@ class _DestinationSelectionDialogState
     super.dispose();
   }
 
+  int get _totalSelected => _selected.values.where((v) => v).length;
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Select Destinations'),
-      content: SingleChildScrollView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: widget.availableDestinations.map((dest) {
-            return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
               children: [
-                Checkbox(
-                  value: _selectedDestinations
-                      .any((d) => d.destination == dest),
-                  onChanged: (value) {
-                    if (value == true) {
-                      setState(() {
-                        _selectedDestinations.add(Destination(
-                          destination: dest,
-                          passengerCount: int.tryParse(
-                                  _passengerControllers[dest]!.text) ??
-                              1,
-                        ));
-                      });
-                    } else {
-                      setState(() {
-                        _selectedDestinations
-                            .removeWhere((d) => d.destination == dest);
-                      });
-                    }
-                  },
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.route, color: Colors.green.shade700, size: 22),
                 ),
-                Expanded(child: Text(dest)),
-                SizedBox(
-                  width: 60,
-                  child: TextField(
-                    controller: _passengerControllers[dest],
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Pax',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) {
-                      if (_selectedDestinations
-                          .any((d) => d.destination == dest)) {
-                        setState(() {
-                          final index = _selectedDestinations
-                              .indexWhere((d) => d.destination == dest);
-                          _selectedDestinations[index] = Destination(
-                            destination: dest,
-                            passengerCount: int.tryParse(value) ?? 1,
-                          );
-                        });
-                      }
-                    },
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Select Destinations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Choose where you are heading', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
                   ),
                 ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop<List<Destination>>([]),
+                  icon: const Icon(Icons.close, size: 20),
+                ),
               ],
-            );
-          }).toList(),
+            ),
+            const SizedBox(height: 16),
+            // Destination list
+            ...widget.availableDestinations.map((dest) {
+              final isSelected = _selected[dest] ?? false;
+              return GestureDetector(
+                onTap: () => setState(() => _selected[dest] = !isSelected),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.green.shade50 : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? Colors.green.shade400 : Colors.grey.shade200,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Checkbox
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.green.shade600 : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isSelected ? Colors.green.shade600 : Colors.grey.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      // Destination name
+                      Expanded(
+                        child: Text(
+                          dest,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: isSelected ? Colors.black87 : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      // Available count badge
+                      if (!isSelected)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${widget.passengerCounts[dest] ?? 0} waiting',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ),
+                      // Passenger count stepper (with min/max enforcement)
+                      if (isSelected) ...[
+                        () {
+                          final current = int.tryParse(_passengerControllers[dest]!.text) ?? 1;
+                          final maxCount = (widget.passengerCounts[dest] ?? 0) as int;
+                          final canDecrease = current > DestinationSelectionDialog.minPassengers;
+                          final canIncrease = current < maxCount;
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: canDecrease ? () {
+                                  _passengerControllers[dest]!.text = '${current - 1}';
+                                  setState(() {});
+                                } : null,
+                                icon: Icon(
+                                  Icons.remove_circle_outline,
+                                  color: canDecrease ? Colors.grey.shade600 : Colors.grey.shade300,
+                                  size: 22,
+                                ),
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                              ),
+                              SizedBox(
+                                width: 36,
+                                child: Text(
+                                  '$current',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: canIncrease ? () {
+                                  _passengerControllers[dest]!.text = '${current + 1}';
+                                  setState(() {});
+                                } : null,
+                                icon: Icon(
+                                  Icons.add_circle_outline,
+                                  color: canIncrease ? Colors.green.shade600 : Colors.grey.shade300,
+                                  size: 22,
+                                ),
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                              ),
+                              Text(
+                                '/${maxCount}',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                              ),
+                            ],
+                          );
+                        }(),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            // Confirm button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _totalSelected > 0
+                    ? () {
+                        final destinations = <Destination>[];
+                        for (var dest in widget.availableDestinations) {
+                          if (_selected[dest] == true) {
+                            final count = int.tryParse(_passengerControllers[dest]!.text) ?? 0;
+                            final available = (widget.passengerCounts[dest] ?? 0) as int;
+                            // Clamp to valid range
+                            final clamped = count.clamp(1, available > 0 ? available : 1);
+                            destinations.add(Destination(
+                              destination: dest,
+                              passengerCount: clamped,
+                            ));
+                          }
+                        }
+                        Navigator.of(context).pop<List<Destination>>(destinations);
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                ),
+                child: Text(
+                  _totalSelected > 0
+                      ? 'Confirm $_totalSelected destination${_totalSelected > 1 ? 's' : ''}'
+                      : 'Select at least one destination',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop<List<Destination>>([]),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_selectedDestinations.isNotEmpty) {
-              Navigator.of(context)
-                  .pop<List<Destination>>(_selectedDestinations);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Please select at least one destination')),
-              );
-            }
-          },
-          child: const Text('Confirm'),
-        ),
-      ],
     );
   }
 }

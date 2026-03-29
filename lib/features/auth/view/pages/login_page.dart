@@ -6,7 +6,6 @@ import 'package:mobileapp/core/widgets/custom_field.dart';
 import 'package:mobileapp/core/widgets/loader.dart';
 import 'package:mobileapp/features/auth/view/widgets/inactive_button.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
-import 'package:mobileapp/main_screen.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -39,11 +38,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       (_, next) => next?.when(
           data: (data) {
             showSnackBar(context, "Welcome back ${data.full_name}!");
-            Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const MainScreen()));
+            // Pop all routes back to root — MyApp watches currentUserNotifier
+            // and userRoleProvider, so it auto-rebuilds with the correct home
+            Navigator.of(context).popUntil((route) => route.isFirst);
           },
           error: (error, stackTrace) {
-            showSnackBar(context, error.toString());
+            final errorMessage = error.toString().replaceAll('Exception: ', '');
+            showSnackBar(context, errorMessage);
           },
           loading: () {}),
     );

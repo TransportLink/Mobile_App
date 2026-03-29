@@ -59,9 +59,9 @@ class DriverRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -84,7 +84,7 @@ class DriverRepository {
         ));
       }
     } on DioException catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 
@@ -115,11 +115,11 @@ class DriverRepository {
         return Right(url);
       } else {
         return Left(AppFailure(
-          "Upload failed: ${response.statusCode} -> ${response.body}",
+          "Upload failed. Please try again.",
         ));
       }
     } catch (e) {
-      return Left(AppFailure("Unexpected error: $e"));
+      return Left(AppFailure("Something went wrong. Please try again."));
     }
   }
 }

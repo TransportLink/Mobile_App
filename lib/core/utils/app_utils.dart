@@ -34,12 +34,34 @@ Future<Map<String, dynamic>> refreshToken(String refreshToken, Dio dio) async {
   }
 }
 
-void showSnackBar(BuildContext context, String content) {
+void showSnackBar(
+  BuildContext context, 
+  String content, {
+  bool isError = false,
+  Duration duration = const Duration(seconds: 3),
+}) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
-        content: Text(content),
+        content: Text(
+          content,
+          style: const TextStyle(fontSize: 14),
+        ),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+        action: isError 
+          ? SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {},
+            )
+          : null,
       ),
     );
 }

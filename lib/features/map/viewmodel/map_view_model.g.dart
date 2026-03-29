@@ -65,12 +65,12 @@ final selectedDestinationsProvider =
 );
 
 typedef SelectedDestinationsRef = AutoDisposeProviderRef<List<Destination>>;
-String _$mapViewModelHash() => r'a597e054a302e731e21f56514ceef982fba2cc9e';
+String _$mapViewModelHash() => r'9266c4260fdc6e371761ec7ce65cbcdecb09c29a';
 
 /// See also [MapViewModel].
 @ProviderFor(MapViewModel)
 final mapViewModelProvider =
-    AutoDisposeNotifierProvider<MapViewModel, AsyncValue<MapState>?>.internal(
+    NotifierProvider<MapViewModel, AsyncValue<MapState>?>.internal(
   MapViewModel.new,
   name: r'mapViewModelProvider',
   debugGetCreateSourceHash:
@@ -79,6 +79,6 @@ final mapViewModelProvider =
   allTransitiveDependencies: null,
 );
 
-typedef _$MapViewModel = AutoDisposeNotifier<AsyncValue<MapState>?>;
+typedef _$MapViewModel = Notifier<AsyncValue<MapState>?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

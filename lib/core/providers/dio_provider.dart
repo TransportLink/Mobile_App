@@ -11,7 +11,7 @@ Dio dio(DioRef ref) {
 
   final dio = Dio(
     BaseOptions(
-      baseUrl: ServerConstants.baseUrl,
+      baseUrl: ServerConstants.authServiceUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
     ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/transaction.dart';
 import 'package:mobileapp/core/model/driver_earnings.dart';
 import 'package:mobileapp/features/driver/repository/earnings_repository.dart';
-import 'package:mobileapp/core/providers/current_driver_notifier.dart';
+import 'package:mobileapp/core/providers/current_user_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
@@ -35,7 +35,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     });
 
     try {
-      final driver = ref.read(currentDriverNotifierProvider);
+      final driver = ref.read(currentUserNotifierProvider);
       if (driver == null) {
         setState(() {
           _error = 'Driver not logged in';
@@ -44,37 +44,42 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         return;
       }
 
-      final driverId = driver.driverId ?? '';
-      if (driverId.isEmpty) return;
+      final driverId = driver.driverId ?? driver.id;
+      if (driverId.isEmpty) {
+        setState(() {
+          _error = 'Please log in again to view your wallet.';
+          _isLoading = false;
+        });
+        return;
+      }
 
       final earningsRepo = ref.read(earningsRepositoryProvider);
-
-      // Load stats
-      final statsResult = await earningsRepo.getDriverStats(driverId: driverId);
-      statsResult.fold(
-        (failure) => setState(() {
-          _error = failure.message;
-          _isLoading = false;
-        }),
-        (stats) => _driverStats = stats,
-      );
-
-      // Load earnings history for selected period
       final periodParam = selectedPeriod.toLowerCase().replaceAll(' ', '');
-      final historyResult = await earningsRepo.getEarningsHistory(
-        driverId: driverId,
-        period: periodParam == 'thisweek'
-            ? 'week'
-            : periodParam == 'thismonth'
-                ? 'month'
-                : periodParam,
+
+      // Load stats and earnings in PARALLEL (cuts load time in half)
+      final results = await Future.wait([
+        earningsRepo.getDriverStats(driverId: driverId),
+        earningsRepo.getEarningsHistory(
+          driverId: driverId,
+          period: periodParam == 'thisweek'
+              ? 'week'
+              : periodParam == 'thismonth'
+                  ? 'month'
+                  : periodParam,
+        ),
+      ]);
+
+      final statsResult = results[0];
+      final historyResult = results[1];
+
+      statsResult.fold(
+        (failure) => _error = failure.message,
+        (stats) => _driverStats = stats as DriverStats,
       );
+
       historyResult.fold(
-        (failure) => setState(() {
-          _error = failure.message;
-          _isLoading = false;
-        }),
-        (history) => _earningsHistory = history,
+        (failure) => _error ??= failure.message,
+        (history) => _earningsHistory = history as EarningsHistory,
       );
 
       setState(() {
@@ -82,7 +87,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load data: $e';
+        _error = 'Something went wrong. Please try again.';
         _isLoading = false;
       });
     }
