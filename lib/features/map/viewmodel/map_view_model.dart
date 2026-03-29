@@ -107,7 +107,36 @@ class MapViewModel extends _$MapViewModel {
         }
       }
 
-      final defaultVehicleId = authLocal.getDefaultVehicleId();
+      var defaultVehicleId = authLocal.getDefaultVehicleId();
+
+      // If no default vehicle set, auto-detect from API
+      if (defaultVehicleId == null && driverId.isNotEmpty) {
+        try {
+          final token = authLocal.getToken('access_token');
+          if (token != null) {
+            final vehicleResp = await Dio().get(
+              '${ServerConstants.authServiceUrl}/vehicles/',
+              options: Options(headers: {'Authorization': 'Bearer $token'}),
+            );
+            if (vehicleResp.statusCode == 200) {
+              final vehicles = vehicleResp.data is List
+                  ? vehicleResp.data as List
+                  : ((vehicleResp.data as Map)['vehicles'] ?? []) as List;
+              if (vehicles.isNotEmpty) {
+                // Auto-select first vehicle as default
+                final vid = vehicles[0]['vehicle_id'] ?? vehicles[0]['id'];
+                if (vid != null) {
+                  defaultVehicleId = vid.toString();
+                  await authLocal.setDefaultVehicleId(defaultVehicleId!);
+                  print('Auto-selected vehicle as default: $defaultVehicleId');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('Vehicle auto-detect failed: $e');
+        }
+      }
 
       // Merge trip info into current state (bus stops may already be populated)
       final currentState = state?.value ?? const MapState();
@@ -602,10 +631,11 @@ class MapViewModel extends _$MapViewModel {
                 .toList();
           }
         } else {
-          etaMinutes = (distanceKm / 15) * 60;
+          // Fallback: assume ~30 km/h avg city driving speed
+          etaMinutes = (distanceKm / 30) * 60;
         }
       } catch (_) {
-        etaMinutes = (distanceKm / 15) * 60;
+        etaMinutes = (distanceKm / 30) * 60;
       }
 
       _lastRoutePosition = position;

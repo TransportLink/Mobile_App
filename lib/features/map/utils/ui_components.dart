@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:collection/collection.dart';
@@ -62,7 +63,7 @@ class UIComponents {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: AppPalette.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -70,7 +71,7 @@ class UIComponents {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: AppPalette.primaryDark,
                           ),
                         ),
                       ),
@@ -102,7 +103,7 @@ class UIComponents {
               ElevatedButton(
                 onPressed: onAccept,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: AppPalette.primaryDark,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Accept'),
@@ -190,7 +191,7 @@ class UIComponents {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: AppPalette.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -198,7 +199,7 @@ class UIComponents {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
+                              color: AppPalette.primaryDark,
                             ),
                           ),
                         ),
@@ -223,7 +224,7 @@ class UIComponents {
               ElevatedButton(
                 onPressed: onArrived,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: AppPalette.primaryDark,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Arrived'),
@@ -265,7 +266,7 @@ class UIComponents {
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue.shade100, Colors.green.shade100],
+              colors: [AppPalette.primary.withOpacity(0.15), AppPalette.primary.withOpacity(0.15)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -282,7 +283,7 @@ class UIComponents {
                     message: 'Current Trip',
                     child: Row(
                       children: [
-                        Icon(Icons.route, color: Colors.blue.shade700, size: 20),
+                        Icon(Icons.route, color: AppPalette.primaryDark, size: 20),
                         const SizedBox(width: 4),
                         Container(
                           constraints: const BoxConstraints(maxWidth: 100),
@@ -308,7 +309,7 @@ class UIComponents {
                       message: 'Estimated Time',
                       child: Row(
                         children: [
-                          Icon(Icons.timer, color: Colors.green.shade700, size: 20),
+                          Icon(Icons.timer, color: AppPalette.primaryDark, size: 20),
                           const SizedBox(width: 4),
                           Text(
                             '${(route.eta / 60).toStringAsFixed(1)} min',
@@ -325,7 +326,7 @@ class UIComponents {
                       message: 'Distance',
                       child: Row(
                         children: [
-                          Icon(Icons.straighten, color: Colors.blue.shade700, size: 20),
+                          Icon(Icons.straighten, color: AppPalette.primaryDark, size: 20),
                           const SizedBox(width: 4),
                           Text(
                             '${(route.distance / 1000).toStringAsFixed(1)} km',
@@ -341,7 +342,7 @@ class UIComponents {
                     message: 'Passengers',
                     child: Row(
                       children: [
-                        Icon(Icons.people, color: Colors.green.shade700, size: 20),
+                        Icon(Icons.people, color: AppPalette.primaryDark, size: 20),
                         const SizedBox(width: 4),
                         Text(
                           '$passengerCount',
@@ -355,7 +356,7 @@ class UIComponents {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Icon(
                     Icons.arrow_upward,
-                    color: Colors.blue.shade700,
+                    color: AppPalette.primaryDark,
                     size: 20,
                   ),
                 ),

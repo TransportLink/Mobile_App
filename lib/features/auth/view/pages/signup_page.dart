@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/providers/user_role_provider.dart';
@@ -119,17 +120,17 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                           margin: const EdgeInsets.symmetric(vertical: 12),
                           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                           decoration: BoxDecoration(
-                            color: _isDriver ? Colors.green.shade50 : Colors.blue.shade50,
+                            color: _isDriver ? AppPalette.primary.withOpacity(0.1) : AppPalette.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _isDriver ? Colors.green.shade200 : Colors.blue.shade200,
+                              color: _isDriver ? AppPalette.primary.withOpacity(0.25) : AppPalette.primary.withOpacity(0.25),
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 _isDriver ? Icons.directions_car : Icons.hail_rounded,
-                                color: _isDriver ? Colors.green.shade700 : Colors.blue.shade700,
+                                color: _isDriver ? AppPalette.primaryDark : AppPalette.primaryDark,
                                 size: 20,
                               ),
                               const SizedBox(width: 10),
@@ -137,7 +138,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                                 _isDriver ? 'Signing up as a Driver' : 'Signing up as a Passenger',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: _isDriver ? Colors.green.shade700 : Colors.blue.shade700,
+                                  color: _isDriver ? AppPalette.primaryDark : AppPalette.primaryDark,
                                 ),
                               ),
                             ],
@@ -220,16 +221,16 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                               phone_number: phoneNumberController.text,
                               date_of_birth: _isDriver
                                   ? dobController.text
-                                  : "",
+                                  : null,
                               license_number: _isDriver
                                   ? "LIC${licenseNumberController.text}"
-                                  : "",
+                                  : null,
                               license_expiry: _isDriver
                                   ? licenseExpiryController.text
-                                  : "",
+                                  : null,
                               national_id: _isDriver
                                   ? "NID${nationalIdController.text}"
-                                  : "");
+                                  : null);
                     }
                   }),
         ),

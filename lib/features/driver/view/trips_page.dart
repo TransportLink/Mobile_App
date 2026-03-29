@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/providers/current_user_notifier.dart';
@@ -123,7 +124,7 @@ class _TripsPageState extends ConsumerState<TripsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.green.shade500, Colors.green.shade700],
+            colors: [AppPalette.primary, AppPalette.primaryDark],
           ),
           borderRadius: BorderRadius.circular(14),
         ),
@@ -243,7 +244,7 @@ class _TripsPageState extends ConsumerState<TripsPage> {
                 setState(() => _selectedFilter = key);
                 _loadTrips();
               },
-              selectedColor: Colors.green.shade600,
+              selectedColor: AppPalette.primary,
               backgroundColor: Colors.grey.shade100,
               showCheckmark: false,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -373,14 +374,16 @@ class _TripsPageState extends ConsumerState<TripsPage> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      locationName.replaceAll('_', ' '),
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
+                    Flexible(
+                      child: Text(
+                        locationName.replaceAll('_', ' '),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     if (destNames.isNotEmpty) ...[
                       Text('  \u2192  ', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                      Expanded(
+                      Flexible(
                         child: Text(
                           destNames.join(', '),
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -391,17 +394,10 @@ class _TripsPageState extends ConsumerState<TripsPage> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text('$totalPax pax',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    Text('  \u2022  ', style: TextStyle(color: Colors.grey.shade300)),
-                    Text(formattedDate,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                    Text('  \u2022  ', style: TextStyle(color: Colors.grey.shade300)),
-                    Text(statusLabel,
-                        style: TextStyle(fontSize: 12, color: statusColor, fontWeight: FontWeight.w600)),
-                  ],
+                Text(
+                  '$totalPax pax  \u2022  $formattedDate  \u2022  $statusLabel',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

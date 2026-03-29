@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import '../model/passenger_state.dart';
 import '../viewmodel/passenger_viewmodel.dart';
 import '../repository/passenger_repository.dart';
@@ -113,22 +114,29 @@ class _PassengerCheckInScreenState
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: passengerState.selectedDestination != null
                           ? () => _handleCheckIn(notifier)
                           : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Check In',
-                        style: TextStyle(
-                          fontSize: 18,
+                      icon: const Icon(Icons.how_to_reg, size: 20),
+                      label: Text(
+                        passengerState.selectedDestination != null
+                            ? 'Check In for ${passengerState.selectedDestination}'
+                            : 'Select a destination',
+                        style: const TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppPalette.primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
                       ),
                     ),
                   ),
@@ -157,7 +165,7 @@ class _PassengerCheckInScreenState
               ),
               child: const Icon(
                 Icons.location_on,
-                color: Colors.blue,
+                color: AppPalette.primary,
                 size: 30,
               ),
             ),

@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:mobileapp/features/auth/utils/auth_utils.dart';
@@ -48,7 +49,7 @@ void showSnackBar(
           content,
           style: const TextStyle(fontSize: 14),
         ),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        backgroundColor: isError ? Colors.red.shade700 : AppPalette.primaryDark,
         duration: duration,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

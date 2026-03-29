@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:flutter_map/flutter_map.dart';
@@ -22,7 +23,7 @@ class MapUtils {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: hasPassengers ? Colors.green.shade700 : Colors.grey.shade600,
+                color: hasPassengers ? AppPalette.primaryDark : Colors.grey.shade600,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -40,7 +41,7 @@ class MapUtils {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: hasPassengers ? Colors.green.shade600 : Colors.grey.shade500,
+                color: hasPassengers ? AppPalette.primary : Colors.grey.shade500,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2.5),
                 boxShadow: [
@@ -81,8 +82,8 @@ class MapUtils {
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.green.withOpacity(0.10),
-              border: Border.all(color: Colors.green.withOpacity(0.25), width: 1),
+              color: AppPalette.navy.withOpacity(0.10),
+              border: Border.all(color: AppPalette.navy.withOpacity(0.25), width: 1),
             ),
           ),
           // Car icon with optional heading rotation
@@ -93,11 +94,11 @@ class MapUtils {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.green.shade600,
+                color: AppPalette.navy,
                 border: Border.all(color: Colors.white, width: 3),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.green.withOpacity(0.4),
+                    color: AppPalette.navy.withOpacity(0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -156,7 +157,7 @@ class MapUtils {
 
     return Polyline(
       points: points,
-      color: Colors.green.shade600,
+      color: AppPalette.navy,
       strokeWidth: 5.0,
     );
   }

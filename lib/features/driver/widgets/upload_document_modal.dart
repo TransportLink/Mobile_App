@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobileapp/core/model/driver_document.dart';
@@ -123,7 +124,7 @@ class _UploadDocumentModalState extends ConsumerState<UploadDocumentModal> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.black,
+          backgroundColor: AppPalette.navy,
         ),
       );
     }
@@ -286,7 +287,7 @@ class _UploadDocumentModalState extends ConsumerState<UploadDocumentModal> {
           child: ElevatedButton(
             onPressed: driverState?.isLoading == true ? null : _uploadDocument,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppPalette.navy,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             child: driverState?.isLoading == true

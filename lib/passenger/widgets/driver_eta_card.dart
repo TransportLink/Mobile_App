@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import '../model/passenger_state.dart';
 
@@ -167,7 +168,7 @@ class DriverEtaCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         color: driver.seatsAvailable > 0
-                            ? Colors.green.shade700
+                            ? AppPalette.primaryDark
                             : Colors.red.shade700,
                       ),
                     ),

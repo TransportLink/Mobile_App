@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/model/driver_document.dart';
 import 'package:mobileapp/core/widgets/loader.dart';
@@ -41,7 +42,7 @@ class _DriverDocumentsPageState extends ConsumerState<DriverDocumentsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Viewing ${document.document_type}'),
-        backgroundColor: Colors.black,
+        backgroundColor: AppPalette.navy,
       ),
     );
   }
@@ -140,7 +141,7 @@ class _DriverDocumentsPageState extends ConsumerState<DriverDocumentsPage> {
   Widget _buildFloatingActionButton() {
     return FloatingActionButton(
       onPressed: _openUploadModal,
-      backgroundColor: Colors.black,
+      backgroundColor: AppPalette.navy,
       child: const Icon(Icons.add, color: Colors.white),
     );
   }

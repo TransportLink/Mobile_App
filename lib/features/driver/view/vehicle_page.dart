@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/model/vehicle_model.dart';
@@ -45,7 +46,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${vehicle.displayName} set as default'),
-          backgroundColor: Colors.green.shade600,
+          backgroundColor: AppPalette.primary,
         ),
       );
     }
@@ -121,7 +122,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Vehicle deleted successfully'),
-            backgroundColor: Colors.black,
+            backgroundColor: AppPalette.navy,
           ),
         );
       }
@@ -180,10 +181,10 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
+                              Icon(Icons.check_circle, size: 16, color: AppPalette.primary),
                               const SizedBox(width: 4),
                               Text('Default vehicle',
-                                  style: TextStyle(fontSize: 13, color: Colors.green.shade600, fontWeight: FontWeight.w500)),
+                                  style: TextStyle(fontSize: 13, color: AppPalette.primary, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
@@ -224,7 +225,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
                   icon: const Icon(Icons.star, size: 18),
                   label: const Text('Set as Default'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
+                    backgroundColor: AppPalette.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -473,7 +474,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDefault ? Colors.green.shade400 : Colors.black12,
+            color: isDefault ? AppPalette.primary.withOpacity(0.6) : Colors.black12,
             width: isDefault ? 2 : 1,
           ),
           boxShadow: [
@@ -492,12 +493,12 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isDefault ? Colors.green.shade50 : Colors.grey[50],
+                    color: isDefault ? AppPalette.primary.withOpacity(0.1) : Colors.grey[50],
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.directions_car,
-                    color: isDefault ? Colors.green.shade600 : Colors.black54,
+                    color: isDefault ? AppPalette.primary : Colors.black54,
                     size: 24,
                   ),
                 ),
@@ -520,31 +521,36 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
                 ),
                 if (isDefault)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: AppPalette.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppPalette.primary.withOpacity(0.35)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
+                        Icon(Icons.check_circle, size: 14, color: AppPalette.primary),
                         const SizedBox(width: 4),
                         Text('Default', style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                          fontSize: 12, fontWeight: FontWeight.w600, color: AppPalette.primaryDark)),
                       ],
                     ),
                   )
                 else
-                  TextButton(
+                  ElevatedButton(
                     onPressed: onSetDefault,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
                     ),
-                    child: Text('Set default',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    child: const Text('Use This',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -591,7 +597,7 @@ class _VehiclesPageState extends ConsumerState<VehiclesPage> {
   Widget _buildFloatingActionButton() {
     return FloatingActionButton(
       onPressed: _openAddModal,
-      backgroundColor: Colors.black,
+      backgroundColor: AppPalette.navy,
       child: const Icon(Icons.add, color: Colors.white),
     );
   }

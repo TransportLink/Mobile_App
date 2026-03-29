@@ -30,14 +30,14 @@ class AuthViewmodel extends _$AuthViewmodel {
   }
 
   Future<void> registerUser({
-    required full_name,
-    required email,
-    required password,
-    required phone_number,
-    required date_of_birth,
-    required license_number,
-    required license_expiry,
-    required national_id,
+    required String full_name,
+    required String email,
+    required String password,
+    required String phone_number,
+    String? date_of_birth,
+    String? license_number,
+    String? license_expiry,
+    String? national_id,
   }) async {
     state = const AsyncValue.loading();
 
@@ -61,10 +61,10 @@ class AuthViewmodel extends _$AuthViewmodel {
             email: email,
             password_hash: '',
             phone_number: phone_number,
-            date_of_birth: date_of_birth,
-            license_number: license_number,
-            license_expiry: license_expiry,
-            national_id: national_id,
+            date_of_birth: date_of_birth ?? '',
+            license_number: license_number ?? '',
+            license_expiry: license_expiry ?? '',
+            national_id: national_id ?? '',
           )),
     };
 
@@ -92,13 +92,11 @@ class AuthViewmodel extends _$AuthViewmodel {
     _authLocalRepository.setToken("refresh_token", token["refresh_token"]);
     UserModel? user = await getUserData();
 
-    // Infer and persist role from profile if not already set
+    // Always infer and set role from profile data on login
+    // Different users may log in on the same device (driver then passenger)
     if (user != null) {
-      final currentRole = ref.read(userRoleProvider);
-      if (currentRole == UserRole.unknown) {
-        final role = user.isDriver ? UserRole.driver : UserRole.passenger;
-        await ref.read(userRoleProvider.notifier).setRole(role);
-      }
+      final role = user.isDriver ? UserRole.driver : UserRole.passenger;
+      await ref.read(userRoleProvider.notifier).setRole(role);
     }
 
     return state = AsyncValue.data(user!);

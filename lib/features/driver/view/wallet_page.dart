@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/transaction.dart';
 import 'package:mobileapp/core/model/driver_earnings.dart';
@@ -231,7 +232,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
             children: [
               Icon(
                 Icons.trending_up,
-                color: todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
+                color: todayEarnings > 0 ? AppPalette.primary.withOpacity(0.35) : Colors.grey,
                 size: 16,
               ),
               const SizedBox(width: 4),
@@ -241,7 +242,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                     : 'No earnings today',
                 style: TextStyle(
                   color:
-                      todayEarnings > 0 ? Colors.green.shade300 : Colors.grey,
+                      todayEarnings > 0 ? AppPalette.primary.withOpacity(0.35) : Colors.grey,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -530,12 +531,12 @@ class _WalletPageState extends ConsumerState<WalletPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: AppPalette.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.local_taxi,
-              color: Colors.green.shade600,
+              color: AppPalette.primary,
               size: 20,
             ),
           ),
@@ -575,7 +576,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.green,
+              color: AppPalette.primary,
             ),
           ),
         ],

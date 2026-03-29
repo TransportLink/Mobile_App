@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:mobileapp/core/widgets/app_button.dart';
 import 'package:mobileapp/features/auth/view/pages/login_page.dart';
 import 'package:mobileapp/features/auth/view/pages/role_selection_page.dart';
@@ -25,6 +26,7 @@ class _AuthPageState extends State<AuthPage> {
                 fit: BoxFit.cover),
           ),
         ),
+        // Navy-to-teal gradient overlay (matches web server brand)
         Container(
           width: double.infinity,
           height: double.infinity,
@@ -34,8 +36,8 @@ class _AuthPageState extends State<AuthPage> {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.transparent,
-                Colors.green.withOpacity(0.2),
-                Colors.green
+                AppPalette.navy.withOpacity(0.4),
+                AppPalette.navy.withOpacity(0.95),
               ],
             ),
           ),
@@ -51,13 +53,6 @@ class _AuthPageState extends State<AuthPage> {
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.55,
             ),
-            decoration: BoxDecoration(boxShadow: [
-              BoxShadow(
-                  color: Colors.green.withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                  offset: const Offset(4, 4))
-            ]),
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -79,10 +74,11 @@ class _AuthPageState extends State<AuthPage> {
                         color: Colors.white60,
                       )),
                   const SizedBox(height: 20),
+                  // Login button — teal brand color
                   AppButton(
                     gradientColors: [
-                      const Color.fromARGB(255, 72, 209, 76),
-                      const Color.fromARGB(255, 113, 204, 8)
+                      AppPalette.primary,
+                      AppPalette.primaryLight,
                     ],
                     text: "Login",
                     onTap: () => Navigator.of(context).push(
@@ -92,6 +88,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // Signup button — subtle translucent
                   AppButton(
                     gradientColors: [
                       Colors.white.withOpacity(0.2),

@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,9 @@ import 'package:mobileapp/features/map/utils/helpers.dart';
 import 'package:mobileapp/features/map/utils/map_utils.dart';
 import 'package:mobileapp/core/model/route.dart' as route_models;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:mobileapp/core/widgets/cached_tile_layer.dart';
+import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
+import 'package:mobileapp/features/driver/view/vehicle_page.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -96,6 +100,22 @@ class _MapScreenState extends ConsumerState<MapScreen>
     }
 
     if (!mounted) return;
+
+    // Listen for focus requests from Demand page (separate from map state)
+    ref.listenManual(pendingFocusBusStopProvider, (previous, next) {
+      if (next == null || !mounted) return;
+      _handleFocusRequest(next);
+    });
+
+    // Also check if there's a pending request right now (set before map tab was active)
+    final pendingFocus = ref.read(pendingFocusBusStopProvider);
+    if (pendingFocus != null) {
+      // Delay slightly to let the map controller initialize
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _handleFocusRequest(pendingFocus);
+      });
+    }
+
     if (!_listenerAdded) {
       _listenerAdded = true;
       ref.listenManual(mapViewModelProvider, (previous, next) {
@@ -121,28 +141,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
             setState(() => _routePolylines = [polyline]);
           }
         }
-        // Handle focus request from Demand page
-        final focusReq = ref.read(pendingFocusBusStopProvider);
-        if (focusReq != null && busStops.isNotEmpty) {
-          // Find matching bus stop and select it
-          final target = busStops.cast<BusStop?>().firstWhere(
-            (s) => s?.systemId == focusReq.systemId,
-            orElse: () => null,
-          );
-          if (target != null && mounted) {
-            // Clear the request
-            ref.read(pendingFocusBusStopProvider.notifier).state = null;
-            // Zoom to the bus stop
-            _mapController.move(LatLng(focusReq.latitude, focusReq.longitude), 16.0);
-            // Auto-select it (shows the bottom card)
-            setState(() {
-              _selectedBusStop = target;
-              _isTripCardMinimized = false;
-            });
-            _animationController?.forward();
-          }
-        }
-
         // Clear polyline if trip ended
         if (state?.isOnTrip == false && _routePolylines.isNotEmpty) {
           if (mounted) setState(() => _routePolylines = []);
@@ -152,10 +150,19 @@ class _MapScreenState extends ConsumerState<MapScreen>
   }
 
   Future<void> _requestLocationPermission() async {
-    var status = await Permission.locationWhenInUse.status;
+    PermissionStatus status;
+    try {
+      status = await Permission.locationWhenInUse.status;
+    } catch (_) {
+      return; // Another permission request in flight
+    }
 
     if (status.isDenied || status.isRestricted || status.isPermanentlyDenied) {
-      status = await Permission.locationWhenInUse.request();
+      try {
+        status = await Permission.locationWhenInUse.request();
+      } catch (_) {
+        return; // Another permission request in flight
+      }
 
       if (status.isDenied) {
         if (mounted) {
@@ -189,6 +196,40 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   geo.Position? _lastKnownPosition;
   double? _lastHeading;
+
+  /// Handle focus request from Demand page — zoom to bus stop and auto-select it
+  void _handleFocusRequest(FocusBusStopRequest req) {
+    if (!mounted) return;
+
+    // Clear the request immediately to avoid re-processing
+    ref.read(pendingFocusBusStopProvider.notifier).state = null;
+
+    // Zoom to the bus stop location
+    _mapController.move(LatLng(req.latitude, req.longitude), 16.0);
+
+    // Find the matching bus stop in loaded data and select it
+    final busStops = ref.read(mapViewModelProvider)?.valueOrNull?.busStops ?? [];
+    final target = busStops.cast<BusStop?>().firstWhere(
+      (s) => s?.systemId == req.systemId,
+      orElse: () => null,
+    );
+
+    if (target != null) {
+      setState(() {
+        _selectedBusStop = target;
+        _isTripCardMinimized = false;
+      });
+      _animationController?.forward();
+    } else {
+      // Bus stop not in loaded data yet — show a snackbar with the name
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Zoomed to ${req.systemId.replaceAll("_", " ")}. Tap the marker to select.'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
 
   Future<void> _showUserLocation() async {
     try {
@@ -329,7 +370,17 @@ class _MapScreenState extends ConsumerState<MapScreen>
           content: const Text('Set a default vehicle first'),
           action: SnackBarAction(
             label: 'Vehicles',
-            onPressed: () => Navigator.pushNamed(context, '/vehicles'),
+            onPressed: () async {
+              await Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const VehiclesPage()));
+              if (mounted) {
+                final authLocal = ref.read(authLocalRepositoryProvider);
+                final vid = authLocal.getDefaultVehicleId();
+                if (vid != null) {
+                  ref.read(mapViewModelProvider.notifier).updateSelectedVehicle(vid);
+                }
+              }
+            },
           ),
         ),
       );
@@ -374,7 +425,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Trip #${updatedState.tripId} accepted! Head to the bus stop.'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppPalette.primary,
         ),
       );
     } else {
@@ -493,24 +544,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
     );
   }
 
-  void _onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
-
-    switch (index) {
-      case 1:
-        Navigator.pushNamed(context, '/wallet');
-        break;
-      case 2:
-        Navigator.pushNamed(context, '/vehicles');
-        break;
-      case 3:
-        Navigator.pushNamed(context, '/documents');
-        break;
-      case 4:
-        Navigator.pushNamed(context, '/profile');
-        break;
-    }
-  }
+  // Navigation handled by NavWithFab — no local nav needed
 
   @override
   Widget build(BuildContext context) {
@@ -536,11 +570,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
               onTap: _onMapTap,
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.airlectric.smarttrotro',
-                errorTileCallback: (tile, error, stackTrace) {},  // Suppress tile error spam
-              ),
+              buildCachedTileLayer(),
               MarkerLayer(markers: allMarkers),
               PolylineLayer(polylines: _routePolylines),
             ],
@@ -567,7 +597,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                         height: 40,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          color: Colors.green.shade600,
+                          color: AppPalette.primary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -585,31 +615,61 @@ class _MapScreenState extends ConsumerState<MapScreen>
               ),
             ),
 
+          // Error banner — dismissible, doesn't block map interaction
           if (mapState?.hasError == true)
             Positioned(
-              top: 100,
-              left: 20,
-              right: 20,
-              child: Card(
-                color: Colors.red[100],
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    '${mapState?.error ?? "Something went wrong"}',
-                    style: const TextStyle(color: Colors.red),
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi_off, size: 18, color: Colors.red.shade400),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Connection issue. Retrying...',
+                          style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => ref.read(mapViewModelProvider.notifier).fetchBusStops(),
+                        child: Icon(Icons.refresh, size: 18, color: Colors.red.shade400),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
 
-          // No-vehicle warning — prompt driver to set a default on the Vehicles page
-          if (mapState?.valueOrNull?.selectedVehicleId == null)
+          // No-vehicle warning — only show after map loaded (not during init)
+          if (!_isLoading && mapState?.valueOrNull?.selectedVehicleId == null)
             Positioned(
               top: 16,
               left: 16,
               right: 16,
               child: GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/vehicles'),
+                onTap: () async {
+                  await Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const VehiclesPage()));
+                  // Reload default vehicle after returning from Vehicles page
+                  if (mounted) {
+                    final authLocal = ref.read(authLocalRepositoryProvider);
+                    final vid = authLocal.getDefaultVehicleId();
+                    if (vid != null) {
+                      ref.read(mapViewModelProvider.notifier).updateSelectedVehicle(vid);
+                    }
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
@@ -733,7 +793,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.green.shade600,
+              color: AppPalette.primary,
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.directions_car, color: Colors.white, size: 18),
@@ -759,7 +819,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
           ),
           Text(
             '$totalPax pax',
-            style: TextStyle(fontSize: 14, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 14, color: AppPalette.primaryDark, fontWeight: FontWeight.w600),
           ),
           const SizedBox(width: 6),
           Icon(Icons.expand_less, size: 18, color: Colors.grey.shade500),
@@ -786,10 +846,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppPalette.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.hail_rounded, color: Colors.green.shade700, size: 24),
+                  child: Icon(Icons.hail_rounded, color: AppPalette.primaryDark, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -829,10 +889,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: count > 0 ? Colors.green.shade50 : Colors.grey.shade50,
+                      color: count > 0 ? AppPalette.primary.withOpacity(0.1) : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: count > 0 ? Colors.green.shade200 : Colors.grey.shade200,
+                        color: count > 0 ? AppPalette.primary.withOpacity(0.25) : Colors.grey.shade200,
                       ),
                     ),
                     child: Row(
@@ -840,7 +900,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                         Icon(
                           Icons.location_on,
                           size: 18,
-                          color: count > 0 ? Colors.green.shade600 : Colors.grey.shade400,
+                          color: count > 0 ? AppPalette.primary : Colors.grey.shade400,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -856,7 +916,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: count > 0 ? Colors.green.shade600 : Colors.grey.shade300,
+                            color: count > 0 ? AppPalette.primary : Colors.grey.shade300,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -882,7 +942,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
               child: ElevatedButton(
                 onPressed: totalCount > 0 ? () => _selectDestinationsAndAcceptTrip(stop) : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
+                  backgroundColor: AppPalette.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
@@ -927,7 +987,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.green.shade500, Colors.green.shade700],
+                    colors: [AppPalette.primary, AppPalette.primaryDark],
                   ),
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -995,12 +1055,12 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppPalette.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     'Trip #${mapState?.tripId ?? ''}',
-                    style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 11, color: AppPalette.primaryDark, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -1021,14 +1081,14 @@ class _MapScreenState extends ConsumerState<MapScreen>
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.people, size: 16, color: Colors.green.shade600),
+                        Icon(Icons.people, size: 16, color: AppPalette.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(d.destination ?? 'Unknown', style: const TextStyle(fontSize: 14)),
                         ),
                         Text(
                           '${d.passengerCount} pax',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.green.shade700),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppPalette.primaryDark),
                         ),
                       ],
                     ),
@@ -1048,7 +1108,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                       icon: const Icon(Icons.check_circle, size: 18),
                       label: const Text('I\'ve Arrived', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
+                        backgroundColor: AppPalette.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
@@ -1142,10 +1202,10 @@ class _DestinationSelectionDialogState
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppPalette.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.route, color: Colors.green.shade700, size: 22),
+                  child: Icon(Icons.route, color: AppPalette.primaryDark, size: 22),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -1174,10 +1234,10 @@ class _DestinationSelectionDialogState
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.green.shade50 : Colors.grey.shade50,
+                    color: isSelected ? AppPalette.primary.withOpacity(0.1) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSelected ? Colors.green.shade400 : Colors.grey.shade200,
+                      color: isSelected ? AppPalette.primary.withOpacity(0.6) : Colors.grey.shade200,
                       width: isSelected ? 1.5 : 1,
                     ),
                   ),
@@ -1188,10 +1248,10 @@ class _DestinationSelectionDialogState
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.green.shade600 : Colors.transparent,
+                          color: isSelected ? AppPalette.primary : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isSelected ? Colors.green.shade600 : Colors.grey.shade400,
+                            color: isSelected ? AppPalette.primary : Colors.grey.shade400,
                             width: 2,
                           ),
                         ),
@@ -1263,7 +1323,7 @@ class _DestinationSelectionDialogState
                                 } : null,
                                 icon: Icon(
                                   Icons.add_circle_outline,
-                                  color: canIncrease ? Colors.green.shade600 : Colors.grey.shade300,
+                                  color: canIncrease ? AppPalette.primary : Colors.grey.shade300,
                                   size: 22,
                                 ),
                                 constraints: const BoxConstraints(),
@@ -1307,7 +1367,7 @@ class _DestinationSelectionDialogState
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
+                  backgroundColor: AppPalette.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,

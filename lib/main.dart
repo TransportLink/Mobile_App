@@ -57,8 +57,19 @@ class MyApp extends ConsumerWidget {
 
 class CustomTheme {
   static final lightThemeMode = ThemeData.light().copyWith(
+      primaryColor: AppPalette.primary,
+      colorScheme: ColorScheme.light(
+        primary: AppPalette.primary,
+        secondary: AppPalette.primaryLight,
+        error: AppPalette.error,
+        surface: AppPalette.surface,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onError: Colors.white,
+        onSurface: AppPalette.textPrimary,
+      ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppPalette.navy,
         elevation: 6,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -71,30 +82,68 @@ class CustomTheme {
         ),
       ),
       scaffoldBackgroundColor: AppPalette.backgroundColor,
-      appBarTheme: const AppBarTheme().copyWith(
-        backgroundColor: AppPalette.backgroundColor,
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppPalette.surface,
+        foregroundColor: AppPalette.textPrimary,
+        elevation: 0,
         titleTextStyle: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w600, color: Colors.black, fontSize: 24),
+            fontWeight: FontWeight.w600, color: AppPalette.textPrimary, fontSize: 22),
       ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppPalette.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 0,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppPalette.primary,
+          side: BorderSide(color: AppPalette.primary.withOpacity(0.5)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppPalette.primary,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppPalette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppPalette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppPalette.primary, width: 2),
+        ),
+        labelStyle: const TextStyle(color: AppPalette.textSecondary),
+      ),
+      dividerColor: AppPalette.divider,
       textTheme: ThemeData.light().textTheme.copyWith(
           bodyLarge: GoogleFonts.bricolageGrotesque(
             fontWeight: FontWeight.w400,
-            color: Colors.black,
+            color: AppPalette.textPrimary,
           ),
           bodyMedium: GoogleFonts.bricolageGrotesque(
             fontWeight: FontWeight.w400,
-            color: Colors.black,
+            color: AppPalette.textPrimary,
           ),
           bodySmall: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400, color: Colors.black),
+              fontWeight: FontWeight.w400, color: AppPalette.textSecondary),
           labelMedium: GoogleFonts.bricolageGrotesque(
             fontWeight: FontWeight.w400,
-            color: Colors.black,
+            color: AppPalette.textPrimary,
           ),
           titleLarge: GoogleFonts.bricolageGrotesque(
-            fontWeight: FontWeight.w400,
-            color: Colors.black,
+            fontWeight: FontWeight.w600,
+            color: AppPalette.textPrimary,
           ),
           titleMedium: GoogleFonts.bricolageGrotesque(
-              fontWeight: FontWeight.w400, color: Colors.black)));
+              fontWeight: FontWeight.w500, color: AppPalette.textPrimary)));
 }

@@ -176,7 +176,14 @@ class PassengerNotifier extends StateNotifier<PassengerState> {
         error: null,
       );
     } else {
-      state = state.copyWith(error: result.error);
+      // Don't show auth/network errors from refreshCheckIn — it's a background check
+      // The user can still check in manually even if this fails
+      await geofenceService.clearCheckInState();
+      state = state.copyWith(
+        isCheckedIn: false,
+        checkInState: null,
+        error: null,
+      );
     }
   }
 

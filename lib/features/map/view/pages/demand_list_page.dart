@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:mobileapp/core/model/demand.dart';
 import 'package:mobileapp/features/driver/viewmodel/demand_viewmodel.dart';
 import 'package:mobileapp/features/map/viewmodel/map_view_model.dart';
@@ -49,7 +50,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
       title: const Text(
         'Nearby Opportunities',
         style: TextStyle(
-          color: Colors.black,
+          color: AppPalette.navy,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
@@ -138,7 +139,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: AppPalette.navy,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -287,7 +288,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: rank <= 3 ? Colors.black : Colors.grey[200],
+                        color: rank <= 3 ? AppPalette.navy : Colors.grey[200],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -314,24 +315,35 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Row(
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
                             children: [
-                              Icon(Icons.directions_walk,
-                                  size: 14, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${opp.distanceKm?.toStringAsFixed(1) ?? '--'} km',
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 12),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.directions_walk,
+                                      size: 14, color: Colors.grey[600]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${opp.distanceKm?.toStringAsFixed(1) ?? '--'} km',
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 12),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Icon(Icons.access_time,
-                                  size: 14, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${opp.etaMinutes?.toStringAsFixed(1) ?? '--'} min',
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 12),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.access_time,
+                                      size: 14, color: Colors.grey[600]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${opp.etaMinutes?.toStringAsFixed(1) ?? '--'} min',
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 12),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -557,7 +569,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                     NavTabController.of(parentContext)?.switchToTab(0);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: AppPalette.navy,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

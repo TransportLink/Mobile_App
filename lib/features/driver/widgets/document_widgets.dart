@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/model/driver_document.dart';
@@ -208,16 +209,16 @@ class DocumentWidgets {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.green.shade50,
+          color: AppPalette.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.green.shade200),
+          border: Border.all(color: AppPalette.primary.withOpacity(0.25)),
         ),
         child: Text(
           'Valid',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Colors.green.shade700,
+            color: AppPalette.primaryDark,
           ),
         ),
       );
@@ -256,7 +257,7 @@ class DocumentWidgets {
           ElevatedButton(
             onPressed: onUploadPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppPalette.navy,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,

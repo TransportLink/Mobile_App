@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/providers/current_user_notifier.dart';
 import 'package:mobileapp/features/auth/repository/auth_local_repository.dart';
@@ -15,7 +16,7 @@ Future logOut(WidgetRef ref, BuildContext context) async {
           actions: [
             ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: AppPalette.navy,
                     foregroundColor: Colors.white),
                 onPressed: () {
                   Navigator.of(context).pop(false);

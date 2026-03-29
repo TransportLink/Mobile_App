@@ -65,7 +65,7 @@ final selectedDestinationsProvider =
 );
 
 typedef SelectedDestinationsRef = AutoDisposeProviderRef<List<Destination>>;
-String _$mapViewModelHash() => r'9266c4260fdc6e371761ec7ce65cbcdecb09c29a';
+String _$mapViewModelHash() => r'70503443169f76eb77b2ea107fb41e2f144721b3';
 
 /// See also [MapViewModel].
 @ProviderFor(MapViewModel)

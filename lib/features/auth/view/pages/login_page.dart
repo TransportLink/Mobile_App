@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobileapp/core/providers/user_role_provider.dart';
 import 'package:mobileapp/core/utils/app_utils.dart';
 import 'package:mobileapp/core/widgets/app_button.dart';
 import 'package:mobileapp/core/widgets/custom_field.dart';
 import 'package:mobileapp/core/widgets/loader.dart';
 import 'package:mobileapp/features/auth/view/widgets/inactive_button.dart';
 import 'package:mobileapp/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:mobileapp/main_screen.dart';
+import 'package:mobileapp/passenger/view/passenger_home_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -38,9 +41,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       (_, next) => next?.when(
           data: (data) {
             showSnackBar(context, "Welcome back ${data.full_name}!");
-            // Pop all routes back to root — MyApp watches currentUserNotifier
-            // and userRoleProvider, so it auto-rebuilds with the correct home
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            // Push fresh root and clear entire navigation stack
+            // This ensures MyApp rebuilds with the correct role
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const _RoleRouter()),
+              (route) => false,
+            );
           },
           error: (error, stackTrace) {
             final errorMessage = error.toString().replaceAll('Exception: ', '');
@@ -107,5 +113,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
           )),
     );
+  }
+}
+
+/// Routes to the correct home screen based on user role after login.
+class _RoleRouter extends ConsumerWidget {
+  const _RoleRouter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(userRoleProvider);
+
+    if (role == UserRole.passenger) {
+      return const PassengerHomePage();
+    }
+    return const MainScreen(); // driver + unknown
   }
 }

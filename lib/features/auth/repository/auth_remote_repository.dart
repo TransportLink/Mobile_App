@@ -105,10 +105,10 @@ class AuthRemoteRepository {
     required String email,
     required String phoneNumber,
     required String password,
-    required String dob,
-    required String licenseNumber,
-    required String licenseExpiry,
-    required String nationalId,
+    String? dob,
+    String? licenseNumber,
+    String? licenseExpiry,
+    String? nationalId,
   }) async {
     final body = {
       "full_name": fullName,

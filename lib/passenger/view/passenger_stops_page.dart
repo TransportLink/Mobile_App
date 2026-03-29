@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -5,6 +6,7 @@ import 'package:mobileapp/core/model/bus_stop.dart';
 import 'package:mobileapp/core/model/bus_stop_location.dart';
 import 'package:mobileapp/features/map/repository/map_repository.dart';
 import 'passenger_checkin_screen.dart';
+import 'walk_to_stop_screen.dart';
 
 /// Shows nearby bus stops with passenger counts and destinations.
 /// Passenger equivalent of the driver's Demand page.
@@ -19,6 +21,7 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
   List<BusStop> _stops = [];
   bool _loading = true;
   String? _error;
+  geo.Position? _userPosition;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
           await geo.Geolocator.getCurrentPosition(desiredAccuracy: geo.LocationAccuracy.medium);
 
       if (!mounted) return;
+      _userPosition = pos;
 
       final repo = ref.read(mapRepositoryProvider);
       final result = await repo.fetchBusStops(
@@ -64,20 +68,58 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
     }
   }
 
-  void _checkIn(BusStop stop) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PassengerCheckInScreen(
-          busStop: BusStopLocation(
-            systemId: stop.systemId,
-            latitude: stop.latitude,
-            longitude: stop.longitude,
-            location: stop.systemId.replaceAll('_', ' '),
+  Future<void> _checkIn(BusStop stop) async {
+    // Get current position to check distance
+    geo.Position? pos;
+    try {
+      pos = await geo.Geolocator.getLastKnownPosition() ??
+          await geo.Geolocator.getCurrentPosition(
+              desiredAccuracy: geo.LocationAccuracy.medium);
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (pos == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Waiting for your location. Please try again in a moment.'),
+        ),
+      );
+      return;
+    }
+
+    final distance = geo.Geolocator.distanceBetween(
+      pos.latitude, pos.longitude,
+      stop.latitude, stop.longitude,
+    );
+
+    if (distance <= kCheckInRadiusMeters) {
+      // Within range — go straight to check-in
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PassengerCheckInScreen(
+            busStop: BusStopLocation(
+              systemId: stop.systemId,
+              latitude: stop.latitude,
+              longitude: stop.longitude,
+              location: stop.systemId.replaceAll('_', ' '),
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } else {
+      // Too far — show walking guidance
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WalkToStopScreen(
+            busStop: stop,
+            userPosition: pos!,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -137,6 +179,17 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
     final hasPassengers = stop.totalCount > 0;
     final dests = stop.destinations.entries.where((e) => e.value > 0).toList();
 
+    // Calculate distance to this stop
+    double? distanceMeters;
+    bool withinRange = false;
+    if (_userPosition != null) {
+      distanceMeters = geo.Geolocator.distanceBetween(
+        _userPosition!.latitude, _userPosition!.longitude,
+        stop.latitude, stop.longitude,
+      );
+      withinRange = distanceMeters <= kCheckInRadiusMeters;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -144,7 +197,7 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: hasPassengers ? Colors.green.shade200 : Colors.grey.shade200,
+          color: hasPassengers ? AppPalette.primary.withOpacity(0.25) : Colors.grey.shade200,
           width: hasPassengers ? 1.5 : 1,
         ),
         boxShadow: [
@@ -159,11 +212,11 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: hasPassengers ? Colors.green.shade50 : Colors.grey.shade100,
+                  color: hasPassengers ? AppPalette.primary.withOpacity(0.1) : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.hail_rounded, size: 22,
-                    color: hasPassengers ? Colors.green.shade700 : Colors.grey.shade500),
+                    color: hasPassengers ? AppPalette.primaryDark : Colors.grey.shade500),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -175,9 +228,49 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${stop.totalCount} people waiting',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          '${stop.totalCount} people waiting',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                        if (distanceMeters != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: withinRange
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  withinRange ? Icons.check_circle : Icons.directions_walk,
+                                  size: 10,
+                                  color: withinRange ? Colors.green.shade700 : Colors.orange.shade700,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  withinRange
+                                      ? 'In range'
+                                      : distanceMeters > 1000
+                                          ? '${(distanceMeters / 1000).toStringAsFixed(1)} km'
+                                          : '${distanceMeters.round()}m',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: withinRange ? Colors.green.shade700 : Colors.orange.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -186,7 +279,7 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: hasPassengers ? Colors.green.shade600 : Colors.grey.shade400,
+                  color: hasPassengers ? AppPalette.primary : Colors.grey.shade400,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -216,7 +309,7 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
                         Text(e.key, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                         const SizedBox(width: 4),
                         Text('${e.value}',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppPalette.primaryDark)),
                       ],
                     ),
                   )).toList(),
@@ -229,10 +322,16 @@ class _PassengerStopsPageState extends ConsumerState<PassengerStopsPage> {
               width: double.infinity, height: 42,
               child: ElevatedButton.icon(
                 onPressed: () => _checkIn(stop),
-                icon: const Icon(Icons.how_to_reg, size: 16),
-                label: const Text('Check In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                icon: Icon(
+                  withinRange ? Icons.how_to_reg : Icons.directions_walk,
+                  size: 16,
+                ),
+                label: Text(
+                  withinRange ? 'Check In' : 'Navigate to Stop',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
+                  backgroundColor: withinRange ? AppPalette.primary : AppPalette.navy,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,

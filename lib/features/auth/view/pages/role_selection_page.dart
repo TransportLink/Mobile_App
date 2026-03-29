@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:mobileapp/core/providers/user_role_provider.dart';
 import 'package:mobileapp/features/auth/view/pages/signup_page.dart';
@@ -40,7 +41,7 @@ class RoleSelectionPage extends StatelessWidget {
                 icon: Icons.directions_car,
                 title: "I'm a Driver",
                 subtitle: 'Find passengers, manage trips, and earn money driving your trotro.',
-                color: Colors.green,
+                color: AppPalette.primary,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const SignupPage(role: UserRole.driver),
@@ -72,7 +73,7 @@ class _RoleCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final MaterialColor color;
+  final Color color;
   final VoidCallback onTap;
 
   const _RoleCard({
@@ -91,19 +92,19 @@ class _RoleCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: color.shade50,
+          color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.shade200, width: 1.5),
+          border: Border.all(color: color.withOpacity(0.25), width: 1.5),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: color.shade100,
+                color: color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, size: 32, color: color.shade700),
+              child: Icon(icon, size: 32, color: color),
             ),
             const SizedBox(width: 18),
             Expanded(
@@ -115,7 +116,7 @@ class _RoleCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: color.shade800,
+                      color: color,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -123,14 +124,14 @@ class _RoleCard extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: color.shade600,
+                      color: color.withOpacity(0.7),
                       height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: color.shade400, size: 24),
+            Icon(Icons.chevron_right, color: color.withOpacity(0.5), size: 24),
           ],
         ),
       ),

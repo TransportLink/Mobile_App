@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 
 class CustomBottomNav extends StatelessWidget {
   final int selectedIndex;
@@ -55,12 +56,12 @@ class CustomBottomNav extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.green.shade50 : Colors.transparent,
+                color: isSelected ? AppPalette.primary.withOpacity(0.1) : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 isSelected ? activeIcon : icon,
-                color: isSelected ? Colors.green.shade700 : Colors.grey.shade500,
+                color: isSelected ? AppPalette.primary : AppPalette.textHint,
                 size: 24,
               ),
             ),
@@ -70,7 +71,7 @@ class CustomBottomNav extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? Colors.green.shade700 : Colors.grey.shade500,
+                color: isSelected ? AppPalette.primary : AppPalette.textHint,
               ),
             ),
           ],

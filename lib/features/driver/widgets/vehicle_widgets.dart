@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:mobileapp/core/model/vehicle_model.dart';
 import 'package:mobileapp/features/driver/utils/vehicle_utils.dart';
 
@@ -239,7 +240,7 @@ class VehicleWidgets {
           ElevatedButton.icon(
             onPressed: onAddVehicle,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppPalette.navy,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 16,
@@ -301,7 +302,7 @@ class VehicleWidgets {
           ElevatedButton(
             onPressed: onRetry,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppPalette.navy,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobileapp/core/model/user_model.dart';
@@ -366,7 +367,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: const BoxDecoration(
-                                  color: Colors.black, shape: BoxShape.circle),
+                                  color: AppPalette.navy, shape: BoxShape.circle),
                               child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
                             ),
                           ),
@@ -394,7 +395,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                       child: ElevatedButton(
                         onPressed: isLoading ? null : _save,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
+                          backgroundColor: AppPalette.navy,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           elevation: 0,

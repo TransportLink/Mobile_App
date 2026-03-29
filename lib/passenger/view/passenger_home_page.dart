@@ -1,3 +1,4 @@
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/features/auth/view/pages/profile_page.dart';
@@ -175,7 +176,7 @@ class _PassengerActivityTab extends ConsumerWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.shade500, Colors.blue.shade700],
+          colors: [AppPalette.primary, AppPalette.primaryDark],
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -248,7 +249,7 @@ class _PassengerActivityTab extends ConsumerWidget {
             icon: Icons.directions_bus,
             value: '${checkIn.incomingDrivers.length}',
             label: 'Trotros coming',
-            color: Colors.green,
+            color: AppPalette.primary,
           ),
         ),
       ],
@@ -259,23 +260,23 @@ class _PassengerActivityTab extends ConsumerWidget {
     required IconData icon,
     required String value,
     required String label,
-    required MaterialColor color,
+    required Color color,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.shade50,
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.shade100),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: color.shade600),
+          Icon(icon, size: 20, color: color),
           const SizedBox(height: 6),
           Text(value, style: TextStyle(
-            fontSize: 20, fontWeight: FontWeight.bold, color: color.shade800)),
+            fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: color.shade600),
+          Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.8)),
               textAlign: TextAlign.center),
         ],
       ),
@@ -304,12 +305,12 @@ class _PassengerActivityTab extends ConsumerWidget {
           Container(
             width: 32, height: 32,
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: AppPalette.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
               child: Text('#$position', style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade700)),
+                fontWeight: FontWeight.bold, fontSize: 13, color: AppPalette.primaryDark)),
             ),
           ),
           const SizedBox(width: 12),
