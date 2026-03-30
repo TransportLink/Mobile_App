@@ -29,6 +29,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
   final TextEditingController licenseExpiryController = TextEditingController();
   final TextEditingController nationalIdController = TextEditingController();
   final formKey = GlobalKey<FormState>();
+  bool _isPasswordVisible = false; // Password visibility toggle
 
   bool get _isDriver => widget.role == UserRole.driver;
 
@@ -99,20 +100,54 @@ class _SignupPageState extends ConsumerState<SignupPage> {
 
     return SafeArea(
       child: Scaffold(
-        appBar: AppBar(centerTitle: true, title: Text(title)),
+        backgroundColor: AppPalette.backgroundColor,
+        appBar: AppBar(
+          centerTitle: true,
+          title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 22, color: AppPalette.textPrimary)),
+          backgroundColor: AppPalette.surface,
+          elevation: 0,
+        ),
         body: isLoading
             ? Loader()
             : Container(
-                margin: EdgeInsets.fromLTRB(10, 0, 10, 10),
+                margin: EdgeInsets.fromLTRB(20, 0, 20, 10),
                 child: SingleChildScrollView(
                   child: Form(
                     key: formKey,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          "assets/images/welcome.png",
-                          fit: BoxFit.cover,
+                        const SizedBox(height: 16),
+                        // Enhanced image container with rounded corners, border and shadow
+                        Container(
+                          width: double.infinity,
+                          height: 280, // Extended vertically
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppPalette.primary.withOpacity(0.3),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppPalette.primary.withOpacity(0.2),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              "assets/images/welcome.png",
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
                         // Role indicator
                         Container(
@@ -158,9 +193,20 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                         CustomField(
                             label: "Password",
                             textEditingController: passwordController,
-                            icon: Icon(Icons.password),
-                            isObscureText: true,
-                            hintText: "e.g, John Doe"),
+                            icon: Icon(Icons.lock_outline, color: AppPalette.primary),
+                            isObscureText: !_isPasswordVisible,
+                            hintText: "e.g, ••••••••",
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                color: AppPalette.textHint,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            )),
                         CustomField(
                             label: "Phone Number",
                             textEditingController: phoneNumberController,

@@ -23,19 +23,30 @@ class ProfilePage extends ConsumerWidget {
     final isDriver = role == UserRole.driver;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppPalette.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
               const SizedBox(height: 12),
-              // Profile card
+              // Profile card with enhanced styling
               _ProfileCard(user: user),
               const SizedBox(height: 24),
 
               // Account section
-              _SectionLabel('Account'),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Account',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppPalette.textSecondary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
               const SizedBox(height: 8),
               _MenuItem(
                 icon: Icons.person_outline,
@@ -68,15 +79,26 @@ class ProfilePage extends ConsumerWidget {
               const SizedBox(height: 20),
 
               // App section
-              _SectionLabel('App'),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'App',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppPalette.textSecondary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
               const SizedBox(height: 8),
               _MenuItem(
                 icon: Icons.info_outline,
-                label: 'About Smart Trotro',
+                label: 'About MeTrotro',
                 onTap: () {
                   showAboutDialog(
                     context: context,
-                    applicationName: 'Smart Trotro',
+                    applicationName: 'MeTrotro',
                     applicationVersion: '1.0.0',
                     children: [
                       const Text('Real-time trotro demand for drivers.\nLive tracking for passengers.'),
@@ -109,11 +131,15 @@ class _ProfileCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          colors: [AppPalette.primary, AppPalette.primaryLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppPalette.primary.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -127,8 +153,8 @@ class _ProfileCard extends StatelessWidget {
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.grey.shade100,
-              border: Border.all(color: Colors.grey.shade200, width: 2),
+              color: Colors.white.withOpacity(0.2),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
             ),
             child: user?.profile_photo_url != null && user!.profile_photo_url!.isNotEmpty
                 ? ClipRRect(
@@ -136,26 +162,26 @@ class _ProfileCard extends StatelessWidget {
                     child: Image.network(
                       user!.profile_photo_url!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(Icons.person, size: 40, color: Colors.grey.shade400),
+                      errorBuilder: (_, __, ___) => Icon(Icons.person, size: 40, color: Colors.white),
                     ),
                   )
-                : Icon(Icons.person, size: 40, color: Colors.grey.shade400),
+                : Icon(Icons.person, size: 40, color: Colors.white),
           ),
           const SizedBox(height: 12),
           Text(
             user?.full_name ?? 'User',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 4),
           Text(
             user?.email ?? '',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
           ),
           if (user?.phone_number != null && user!.phone_number.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
               user!.phone_number,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
             ),
           ],
         ],
@@ -203,12 +229,13 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemColor = color ?? Colors.black87;
+    final itemColor = color ?? AppPalette.textPrimary;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.white,
+        color: AppPalette.surface,
         borderRadius: BorderRadius.circular(14),
+        elevation: 0,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
@@ -216,13 +243,20 @@ class _MenuItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Icon(icon, size: 22, color: itemColor),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppPalette.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: itemColor == Colors.red ? Colors.red : AppPalette.primary),
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(label,
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: itemColor)),
                 ),
-                Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
+                Icon(Icons.chevron_right, size: 20, color: AppPalette.textHint),
               ],
             ),
           ),

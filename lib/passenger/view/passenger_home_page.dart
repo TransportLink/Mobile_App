@@ -40,6 +40,52 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
     }
 
     return Scaffold(
+      backgroundColor: AppPalette.backgroundColor,
+      appBar: AppBar(
+        title: Text(
+          isCheckedIn ? 'Live Tracking' : 'Find Your Trotro',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 22, color: AppPalette.textPrimary),
+        ),
+        backgroundColor: AppPalette.surface,
+        elevation: 0,
+        actions: [
+          if (isCheckedIn)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppPalette.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppPalette.info.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppPalette.info,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'In Queue',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppPalette.info,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: IndexedStack(
         index: _selectedIndex,
         children: [

@@ -23,7 +23,7 @@ class RoleSelectionPage extends StatelessWidget {
             children: [
               const SizedBox(height: 20),
               const Text(
-                'How will you\nuse Smart Trotro?',
+                'How will you\nuse MeTrotro?',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,

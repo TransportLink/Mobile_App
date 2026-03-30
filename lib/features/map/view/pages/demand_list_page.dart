@@ -44,14 +44,14 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   PreferredSizeWidget _buildAppBar() {
     final demandState = ref.watch(demandViewmodelProvider);
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.surface,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: const Text(
         'Nearby Opportunities',
         style: TextStyle(
           color: AppPalette.navy,
-          fontSize: 20,
+          fontSize: 22,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -68,7 +68,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
         else
           IconButton(
             onPressed: () => ref.read(demandViewmodelProvider.notifier).loadDemand(),
-            icon: const Icon(Icons.refresh, color: Colors.black),
+            icon: const Icon(Icons.refresh, color: AppPalette.primary),
           ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 
 class CustomField extends StatelessWidget {
   const CustomField(
@@ -10,7 +11,8 @@ class CustomField extends StatelessWidget {
       required this.icon,
       this.validation,
       this.onTap,
-      this.isObscureText = false});
+      this.isObscureText = false,
+      this.suffixIcon});
 
   final String label;
   final String hintText;
@@ -19,6 +21,7 @@ class CustomField extends StatelessWidget {
   final VoidCallback? onTap;
   final Icon icon;
   final bool isObscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -48,20 +51,24 @@ class CustomField extends StatelessWidget {
             onTap: onTap,
             decoration: InputDecoration(
               prefixIcon: icon,
+              suffixIcon: suffixIcon,
               hintText: hintText,
               hintStyle: GoogleFonts.bricolageGrotesque(
-                  fontSize: 18, color: Color.fromARGB(255, 173, 173, 173)),
+                  fontSize: 18, color: AppPalette.textHint),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                    color: Color.fromARGB(255, 216, 216, 216), width: 1.5),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                    color: AppPalette.border, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                  color: Colors.black,
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppPalette.primary,
+                  width: 2,
                 ),
               ),
+              filled: true,
+              fillColor: AppPalette.surface,
             ),
           )
         ],

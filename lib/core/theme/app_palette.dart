@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Smart Trotro brand colors — matches web server (base.html CSS variables).
+/// MeTrotro brand colors — matches web server (base.html CSS variables).
 ///
 /// Primary: Teal Green (#16a085) — buttons, active states, key actions
 /// Secondary: Navy (#1a1a2e) — text, headers, navigation

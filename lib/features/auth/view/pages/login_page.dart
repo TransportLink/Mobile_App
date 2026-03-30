@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobileapp/core/providers/user_role_provider.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 import 'package:mobileapp/core/utils/app_utils.dart';
 import 'package:mobileapp/core/widgets/app_button.dart';
 import 'package:mobileapp/core/widgets/custom_field.dart';
@@ -21,6 +22,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final formKey = GlobalKey<FormState>();
+  bool _isPasswordVisible = false; // Password visibility toggle
 
   @override
   void dispose() {
@@ -56,36 +58,92 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(centerTitle: true, title: Text("Sign In")),
+      backgroundColor: AppPalette.backgroundColor,
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text("Sign In", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 22, color: AppPalette.textPrimary)),
+        backgroundColor: AppPalette.surface,
+        elevation: 0,
+      ),
       body: isLoading
           ? Loader()
           : SafeArea(
               child: SingleChildScrollView(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
+                  margin: EdgeInsets.fromLTRB(20, 0, 20, 0),
                   child: Form(
                     key: formKey,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         const SizedBox(
-                          height: 12,
+                          height: 24,
                         ),
-                        Image.asset(
-                          "assets/images/welcome.png",
-                          fit: BoxFit.cover,
+                        // Enhanced image container with rounded corners, border and shadow
+                        Container(
+                          width: double.infinity,
+                          height: 280, // Extended vertically
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppPalette.primary.withOpacity(0.3),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppPalette.primary.withOpacity(0.2),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              "assets/images/welcome.png",
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 24),
+                        // Welcome text
+                        Text(
+                          'Welcome Back!',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 24, color: AppPalette.textPrimary),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sign in to continue',
+                          style: TextStyle(fontSize: 16, color: AppPalette.textSecondary),
+                        ),
+                        const SizedBox(height: 32),
                         CustomField(
                             label: "Email address",
                             textEditingController: emailController,
-                            icon: Icon(Icons.email),
+                            icon: Icon(Icons.email_outlined, color: AppPalette.primary),
                             hintText: "e.g, abc@email.com"),
                         CustomField(
                             label: "Password",
                             textEditingController: passwordController,
-                            icon: Icon(Icons.password),
-                            isObscureText: true,
-                            hintText: "e.g, John Doe"),
+                            icon: Icon(Icons.lock_outline, color: AppPalette.primary),
+                            isObscureText: !_isPasswordVisible,
+                            hintText: "e.g, ••••••••",
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                color: AppPalette.textHint,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            )),
                       ],
                     ),
                   ),
@@ -93,10 +151,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
       bottomNavigationBar: Container(
-          height: 72,
-          color: Colors.white,
+          height: 80,
+          color: AppPalette.surface,
           child: Padding(
-            padding: EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.only(bottom: 16, left: 16, right: 16),
             child: isLoading
                 ? InactiveButton("Login")
                 : AppButton(

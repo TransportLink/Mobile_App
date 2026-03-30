@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobileapp/core/theme/app_palette.dart';
 
 class AppButton extends StatelessWidget {
   const AppButton(
@@ -23,7 +24,7 @@ class AppButton extends StatelessWidget {
           height: 60,
           width: double.infinity,
           decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(12),
               color: const Color.fromARGB(255, 199, 199, 199)),
           child: Align(
             alignment: Alignment.center,
@@ -47,13 +48,19 @@ class AppButton extends StatelessWidget {
         height: 60,
         width: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
               colors: gradientColors ??
-                  [
-                    Colors.black.withOpacity(0.9),
-                    Colors.black.withOpacity(0.7)
-                  ]),
+                  [AppPalette.primary, AppPalette.primaryLight],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight),
+          boxShadow: [
+            BoxShadow(
+              color: AppPalette.primary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Align(
           alignment: Alignment.center,

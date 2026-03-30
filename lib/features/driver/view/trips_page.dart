@@ -73,10 +73,11 @@ class _TripsPageState extends ConsumerState<TripsPage> {
     final hasActiveTrip = mapState?.isOnTrip ?? false;
 
     return Scaffold(
+      backgroundColor: AppPalette.backgroundColor,
       appBar: AppBar(
-        title: const Text('Trips', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: const Text('Trips', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 22)),
+        backgroundColor: AppPalette.surface,
+        foregroundColor: AppPalette.textPrimary,
         elevation: 0,
       ),
       body: SafeArea(
@@ -177,15 +178,22 @@ class _TripsPageState extends ConsumerState<TripsPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppPalette.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppPalette.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Today',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade800)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppPalette.textPrimary)),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -202,11 +210,11 @@ class _TripsPageState extends ConsumerState<TripsPage> {
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: Colors.grey.shade400),
+        Icon(icon, size: 20, color: AppPalette.primary),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppPalette.textPrimary)),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        Text(label, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary)),
       ],
     );
   }
@@ -234,7 +242,7 @@ class _TripsPageState extends ConsumerState<TripsPage> {
               label: Text(
                 count != null ? '$label ($count)' : label,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey.shade700,
+                  color: isSelected ? Colors.white : AppPalette.textPrimary,
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
@@ -245,9 +253,14 @@ class _TripsPageState extends ConsumerState<TripsPage> {
                 _loadTrips();
               },
               selectedColor: AppPalette.primary,
-              backgroundColor: Colors.grey.shade100,
+              backgroundColor: AppPalette.surface,
               showCheckmark: false,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? AppPalette.primary : AppPalette.border,
+                ),
+              ),
             ),
           );
         }).toList(),
