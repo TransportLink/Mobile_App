@@ -507,41 +507,63 @@ class _MapScreenState extends ConsumerState<MapScreen>
   Future<void> _cancelTrip() async {
     setState(() => _isLoading = true);
 
-    await ref.read(mapViewModelProvider.notifier).cancelTrip();
+    final success = await ref.read(mapViewModelProvider.notifier).cancelTrip();
 
     if (!mounted) return;
     setState(() {
-      _routePolylines = [];
-      _isTripCardMinimized = false;
       _isLoading = false;
+      if (success) {
+        _routePolylines = [];
+        _isTripCardMinimized = false;
+      }
     });
 
-    // Force refresh bus stop counts immediately
-    ref.read(mapViewModelProvider.notifier).fetchBusStops();
+    if (success) {
+      // Force refresh bus stop counts immediately
+      ref.read(mapViewModelProvider.notifier).fetchBusStops();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Trip cancelled'), backgroundColor: Colors.orange),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Trip cancelled'), backgroundColor: Colors.orange),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to cancel trip. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _arrivedAtDestination() async {
     setState(() => _isLoading = true);
 
-    await ref.read(mapViewModelProvider.notifier).arrivedAtDestination();
+    final success = await ref.read(mapViewModelProvider.notifier).arrivedAtDestination();
 
     if (!mounted) return;
     setState(() {
-      _routePolylines = [];
-      _isTripCardMinimized = false;
       _isLoading = false;
+      if (success) {
+        _routePolylines = [];
+        _isTripCardMinimized = false;
+      }
     });
 
-    // Force refresh bus stop counts immediately
-    ref.read(mapViewModelProvider.notifier).fetchBusStops();
+    if (success) {
+      // Force refresh bus stop counts immediately
+      ref.read(mapViewModelProvider.notifier).fetchBusStops();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Trip completed!'), backgroundColor: Colors.green),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Trip completed!'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to complete trip. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Navigation handled by NavWithFab — no local nav needed
@@ -1104,7 +1126,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   child: SizedBox(
                     height: 46,
                     child: ElevatedButton.icon(
-                      onPressed: _arrivedAtDestination,
+                      onPressed: _isLoading ? null : _arrivedAtDestination,
                       icon: const Icon(Icons.check_circle, size: 18),
                       label: const Text('I\'ve Arrived', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       style: ElevatedButton.styleFrom(
@@ -1120,7 +1142,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 SizedBox(
                   height: 46,
                   child: OutlinedButton(
-                    onPressed: () => _showCancelConfirmation(),
+                    onPressed: _isLoading ? null : () => _showCancelConfirmation(),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade600,
                       side: BorderSide(color: Colors.red.shade300),

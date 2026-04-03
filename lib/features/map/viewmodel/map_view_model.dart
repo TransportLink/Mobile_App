@@ -32,6 +32,8 @@ class MapViewModel extends _$MapViewModel {
   geo.Position? _lastRoutePosition;  // Position when route was last recalculated
   bool _fetchingBusStops = false;   // Prevents concurrent /map/systems requests
   bool _recalculatingRoute = false; // Prevents overlapping OSRM calls
+  final Set<int> _cancellingTripIds = {}; // Prevents duplicate /api/cancel_trip/ requests
+  final Set<int> _completingTripIds = {}; // Prevents duplicate /api/complete_trip/ requests
 
   @override
   AsyncValue<MapState>? build() {
@@ -350,15 +352,28 @@ class MapViewModel extends _$MapViewModel {
     }
   }
 
-  Future<void> cancelTrip() async {
+  Future<bool> cancelTrip() async {
     final currentState = state?.value;
     final currentDriver = ref.read(currentUserNotifierProvider);
     final driverId = currentDriver?.driverId ?? currentDriver?.id ?? '';
     final tripId = currentState?.tripId;
 
+    if (tripId == null) {
+      await _clearTripState();
+      return true;
+    }
+
+    if (_cancellingTripIds.contains(tripId)) {
+      print('Trip $tripId is already being cancelled, skipping duplicate call');
+      return false;
+    }
+
+    _cancellingTripIds.add(tripId);
+
     // Step 1: Cancel on Django (source of truth)
     // Django handles everything: deactivate trip → release passengers →
     // broadcast demand update → notify Edge System for announcement
+    bool success = false;
     if (driverId.isNotEmpty) {
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 10),
@@ -370,7 +385,7 @@ class MapViewModel extends _$MapViewModel {
           final response = await dio.post(
             '${ServerConstants.webServerUrl}/api/cancel_trip/',
             data: {
-              'trip_id': tripId ?? 0,
+              'trip_id': tripId,
               'driver_id': driverId,
             },
             options: Options(headers: {
@@ -380,36 +395,59 @@ class MapViewModel extends _$MapViewModel {
           );
 
           if (response.statusCode == 200) {
-            print('Trip cancelled on server: ${response.data}');
+            print('Trip $tripId cancelled on server: ${response.data}');
+            success = true;
             break;
           }
         } catch (e) {
-          print('Cancel attempt $attempt/3 failed: $e');
+          print('Cancel attempt $attempt/3 for trip $tripId failed: $e');
           if (attempt < 3) await Future.delayed(const Duration(seconds: 2));
         }
       }
+    } else {
+      // No driver ID but we have a trip ID? Clear it locally anyway
+      success = true;
     }
 
-    // Step 2: Clear local state (always, regardless of server response)
-    await _clearTripState();
+    _cancellingTripIds.remove(tripId);
+
+    // Step 2: Clear local state (only if server succeeded or if we have no driver info)
+    if (success) {
+      await _clearTripState();
+    }
+    
+    return success;
   }
 
-  Future<void> arrivedAtDestination() async {
+  Future<bool> arrivedAtDestination() async {
     final currentState = state?.value;
     final currentDriver = ref.read(currentUserNotifierProvider);
     final driverId = currentDriver?.driverId ?? currentDriver?.id ?? '';
     final tripId = currentState?.tripId;
 
+    if (tripId == null) {
+      await _clearTripState();
+      return true;
+    }
+
+    if (_completingTripIds.contains(tripId)) {
+      print('Trip $tripId is already being completed, skipping duplicate call');
+      return false;
+    }
+
+    _completingTripIds.add(tripId);
+
     // Tell Django the trip is complete
     // Django handles: deactivate trip → calculate earnings → release passengers →
     // broadcast demand update → notify Edge System
-    if (tripId != null && driverId.isNotEmpty) {
+    bool success = false;
+    if (driverId.isNotEmpty) {
       try {
         final dio = Dio(BaseOptions(
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
         ));
-        await dio.post(
+        final response = await dio.post(
           '${ServerConstants.webServerUrl}/complete_trip/',
           data: {
             'trip_id': tripId,
@@ -421,16 +459,26 @@ class MapViewModel extends _$MapViewModel {
             'Content-Type': 'application/json',
           }),
         );
-        print('Trip $tripId completed on server');
+        if (response.statusCode == 200) {
+          print('Trip $tripId completed on server');
+          success = true;
+        }
       } catch (e) {
-        print('Complete trip failed, falling back to cancel: $e');
+        print('Complete trip $tripId failed, falling back to cancel: $e');
         // Fallback: at minimum, cancel the trip so passengers are released
-        await cancelTrip();
-        return;
+        success = await cancelTrip();
       }
+    } else {
+      success = true;
     }
 
-    await _clearTripState();
+    _completingTripIds.remove(tripId);
+
+    if (success) {
+      await _clearTripState();
+    }
+    
+    return success;
   }
 
   Future<void> updateSearchRadius(double radius) async {
