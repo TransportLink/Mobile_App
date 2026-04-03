@@ -540,6 +540,32 @@ class MapViewModel extends _$MapViewModel {
             longitude: position.longitude,
             address: _lastGeocodedAddress,
           );
+
+          // Task: Automatic Arrival Detection
+          // If on a trip, check distance to destination (last point in route)
+          final currentState = state?.value;
+          if (currentState != null && currentState.isOnTrip && currentState.currentRoute != null) {
+            final routeCoords = currentState.currentRoute!.coordinates;
+            if (routeCoords.isNotEmpty) {
+              final destCoord = routeCoords.last; // [lng, lat] from GeoJSON
+              final destLat = destCoord[1];
+              final destLng = destCoord[0];
+
+              final distanceToDest = geo.Geolocator.distanceBetween(
+                position.latitude, position.longitude,
+                destLat, destLng,
+              );
+
+              // 200m radius for "Arrived" verification
+              final isNear = distanceToDest < 200;
+              if (isNear != currentState.isNearDestination) {
+                state = AsyncValue.data(currentState.copyWith(isNearDestination: isNear));
+                if (isNear) {
+                  print("Driver arrived at destination: ${currentState.currentRoute!.destination}");
+                }
+              }
+            }
+          }
         } catch (e) {
           // Non-critical — app works without location updates
         }
@@ -759,6 +785,7 @@ class MapViewModel extends _$MapViewModel {
       searchRadius: currentState.searchRadius,
       selectedVehicleId: currentState.selectedVehicleId,
       isOnTrip: false,
+      isNearDestination: false,
       // currentRoute, tripId, currentBusStopId, selectedDestinations = defaults (null/empty)
     );
 

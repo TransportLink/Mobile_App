@@ -11,6 +11,7 @@ class MapState {
   final int? tripId;
   final double searchRadius;
   final bool isOnTrip;
+  final bool isNearDestination;
 
   const MapState({
     this.busStops = const [],
@@ -21,6 +22,7 @@ class MapState {
     this.tripId,
     this.searchRadius = 5.0,
     this.isOnTrip = false,
+    this.isNearDestination = false,
   });
 
   MapState copyWith({
@@ -32,6 +34,7 @@ class MapState {
     int? tripId,
     double? searchRadius,
     bool? isOnTrip,
+    bool? isNearDestination,
   }) {
     return MapState(
       busStops: busStops ?? this.busStops,
@@ -42,6 +45,7 @@ class MapState {
       tripId: tripId ?? this.tripId,
       searchRadius: searchRadius ?? this.searchRadius,
       isOnTrip: isOnTrip ?? this.isOnTrip,
+      isNearDestination: isNearDestination ?? this.isNearDestination,
     );
   }
 

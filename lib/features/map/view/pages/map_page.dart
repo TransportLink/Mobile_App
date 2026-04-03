@@ -1125,15 +1125,30 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 Expanded(
                   child: SizedBox(
                     height: 46,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _arrivedAtDestination,
-                      icon: const Icon(Icons.check_circle, size: 18),
-                      label: const Text('I\'ve Arrived', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppPalette.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
+                    child: Tooltip(
+                      message: (mapState?.isNearDestination ?? false) 
+                          ? 'Confirm arrival' 
+                          : 'You must be within 200m of the destination to complete the trip',
+                      child: ElevatedButton.icon(
+                        onPressed: (_isLoading || !(mapState?.isNearDestination ?? false)) 
+                            ? null 
+                            : _arrivedAtDestination,
+                        icon: Icon(
+                          (mapState?.isNearDestination ?? false) ? Icons.check_circle : Icons.location_off, 
+                          size: 18
+                        ),
+                        label: Text(
+                          (mapState?.isNearDestination ?? false) ? 'I\'ve Arrived' : 'TOO FAR', 
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: (mapState?.isNearDestination ?? false) 
+                              ? AppPalette.primary 
+                              : Colors.grey.shade400,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
                       ),
                     ),
                   ),
