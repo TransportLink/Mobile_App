@@ -225,6 +225,34 @@ Mobile_App/
 └── README.md
 ```
 
+### Geofence Detection Logic
+
+```mermaid
+graph TD
+    A[Geofence Service Start] --> B[Request GPS Permissions]
+    B --> C{Permissions Granted?}
+    C -->|No| D[Show Alert & Stop]
+    C -->|Yes| E[Start Location Stream]
+    
+    E --> F[Get Current Coordinates]
+    F --> G[Calculate Distance to Nearest Bus Stop]
+    G --> H{Distance < 50m?}
+    
+    H -->|Yes| I{Already in Geofence?}
+    I -->|No| J[Trigger Enter Event]
+    J --> K[Show Check-In Notification]
+    K --> L[Update UI to Check-In Mode]
+    I -->|Yes| M[Maintain State]
+    
+    H -->|No| N{Was in Geofence?}
+    N -->|Yes| O[Trigger Exit Event]
+    O --> P[Auto Check-Out API Call]
+    P --> Q[Clear Check-In State]
+    N -->|No| R[Continue Monitoring]
+    
+    M & L & R & Q -->|Next Interval| F
+```
+
 ---
 
 ## State Management
